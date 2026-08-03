@@ -46,19 +46,29 @@ else
   echo "search=grep (rg not installed)"
 fi
 
-# --- 1) Leftover UI types (definitions live under ByVpn*) ---
-# Exclude Scripts/ so this checker's own messages do not self-match.
-UI_LEFTOVER='Nym(Spacing|Button|Color|TextStyle|Font|Snackbar|Divider|BackButton|TunnelManager)'
-if command -v rg >/dev/null 2>&1; then
-  hits="$(rg -n --glob '*.swift' "${UI_LEFTOVER}" . 2>/dev/null || true)"
+# --- 1) Leftover UI branding (must be ByVpn*) ---
+# Catch type names AND camelCase members that smoke builds actually hit.
+UI_PATTERNS=(
+  'Nym(Spacing|Button|Color|TextStyle|Font|Snackbar|Divider|BackButton|TunnelManager)'
+  'Color\.Nym'
+  '\.nymTextStyle'
+  '\.nymSnackbar'
+  '\.nymText\b'
+)
+ui_hits=""
+for pat in "${UI_PATTERNS[@]}"; do
+  if command -v rg >/dev/null 2>&1; then
+    chunk="$(rg -n --glob '*.swift' "$pat" . 2>/dev/null || true)"
+  else
+    chunk="$(grep -REn --include='*.swift' -E "$pat" . 2>/dev/null || true)"
+  fi
+  [[ -n "$chunk" ]] && ui_hits+="${chunk}"$'\n'
+done
+if [[ -n "${ui_hits//[$'\n']/}" ]]; then
+  bad "leftover Nym UI branding in Swift (use Color.ByVpn / byVpnTextStyle / byVpnSnackbar)"
+  echo "$ui_hits" | head -40
 else
-  hits="$(grep -REn --include='*.swift' -E "${UI_LEFTOVER}" . 2>/dev/null || true)"
-fi
-if [[ -n "$hits" ]]; then
-  bad "leftover Nym* UI symbols (rename to ByVpn*)"
-  echo "$hits" | head -30
-else
-  ok "no leftover Nym* UI symbols in Swift"
+  ok "no leftover Nym UI branding in Swift"
 fi
 
 # --- 2) UniFFI keepers: app still uses these; sed must NOT rename them ---

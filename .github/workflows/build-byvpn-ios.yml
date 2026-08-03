@@ -47,17 +47,30 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          # Prefer a recent stable Xcode on the image; fall back to default.
+          # Routes requires Swift tools 6.2 → need Xcode 26.x (not 16.4 / Swift 6.1).
+          ls /Applications | grep -E '^Xcode' || true
+          selected=""
           for cand in \
-            /Applications/Xcode_16.4.app \
-            /Applications/Xcode_16.3.app \
-            /Applications/Xcode_16.2.app \
+            /Applications/Xcode_26.3.app \
+            /Applications/Xcode_26.2.app \
+            /Applications/Xcode_26.1.1.app \
+            /Applications/Xcode_26.1.app \
+            /Applications/Xcode_26.0.1.app \
+            /Applications/Xcode_26.0.app \
+            /Applications/Xcode_26.app \
             /Applications/Xcode.app; do
             if [[ -d "$cand" ]]; then
-              sudo xcode-select -s "$cand"
+              selected="$cand"
               break
             fi
           done
+          if [[ -z "$selected" ]]; then
+            echo "::error::No Xcode 26.x found (need Swift 6.2 for Routes). Available:"
+            ls /Applications | grep -E '^Xcode' || true
+            exit 1
+          fi
+          sudo xcode-select -s "$selected"
+          echo "Using $selected"
           xcodebuild -version
           swift --version
 

@@ -9,7 +9,8 @@ public enum Constants: String {
     case supportURL = "https://support.byvpn.app"
     case serverLocationURL = "https://support.byvpn.app/en-us/articles/26448676449297-How-is-server-location-determined-by-ByVPN"
     case streamingServicesURL = "https://support.byvpn.app/en-us/articles/35279486714641-Why-can-t-I-access-streaming-services-while-using-ByVPN"
-    case locationAccuracyURL = "https://support.byvpn.app/en-us/articles/26448676449297-How-is-server-location-determined-by-ByVPN"
+    // Same article as serverLocationURL; fragment keeps String raw values unique for Swift.
+    case locationAccuracyURL = "https://support.byvpn.app/en-us/articles/26448676449297-How-is-server-location-determined-by-ByVPN#accuracy"
     case termsOfUseURL = "https://byvpn.app/terms"
     case privacyPolicyURL = "https://byvpn.app/privacy"
     case newSupportRequest = "https://support.byvpn.app/requests/new"
@@ -28,10 +29,10 @@ public enum Constants: String {
     case dnsLearnMoreURL = "https://support.byvpn.app/en-us/articles/41140533515665"
     case mixnetParametersLearnMoreURL = "https://byvpn.app/docs/mixnet"
 
-    case telegramLink = "https://byvpn.app/community"
-    case discordLink = "https://byvpn.app/community"
+    case telegramLink = "https://byvpn.app/community#telegram"
+    case discordLink = "https://byvpn.app/community#discord"
     case ghIssuesLink = "https://byvpn.app/support"
-    case matrixLink = "https://byvpn.app/community"
+    case matrixLink = "https://byvpn.app/community#matrix"
     case crowdin = "https://byvpn.app/translate"
 
     case networkAndApiStatus = "https://status.byvpn.app"

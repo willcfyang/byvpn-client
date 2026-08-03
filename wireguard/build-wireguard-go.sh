@@ -281,9 +281,23 @@ function build_ios {
     export CGO_LDFLAGS="-isysroot $SDKROOT -arch $GOARCH"
     create_folder_and_build "aarch64-apple-ios-sim"
 
+    # cargo-swift iOS Simulator universal = x86_64-apple-ios + aarch64-apple-ios-sim
+    echo "🍎 Building for ios-sim/x86_64"
+    export GOARCH=amd64
+    export GOOS=ios
+    export SDKROOT=$(xcrun --show-sdk-path --sdk iphonesimulator)
+    export CC="$(xcrun -sdk $SDKROOT --find clang) -arch x86_64 -isysroot $SDKROOT"
+    export CFLAGS="-isysroot $SDKROOT -arch x86_64 -I$SDKROOT/usr/include"
+    export LD_LIBRARY_PATH="$SDKROOT/usr/lib"
+    export CGO_CFLAGS="-isysroot $SDKROOT -arch x86_64"
+    export CGO_LDFLAGS="-isysroot $SDKROOT -arch x86_64"
+    create_folder_and_build "x86_64-apple-ios"
+
     echo "🍎 Creating universal ios-sim binary"
     mkdir -p "../../build/lib/universal-apple-ios-sim/"
-    cp "../../build/lib/aarch64-apple-ios-sim/libwg.a" "../../build/lib/universal-apple-ios-sim/libwg.a"
+    lipo -create -output "../../build/lib/universal-apple-ios-sim/libwg.a" \
+      "../../build/lib/aarch64-apple-ios-sim/libwg.a" \
+      "../../build/lib/x86_64-apple-ios/libwg.a"
     cp "../../build/lib/aarch64-apple-ios/libwg.h" "../../build/lib/universal-apple-ios-sim/libwg.h"
 
     popd

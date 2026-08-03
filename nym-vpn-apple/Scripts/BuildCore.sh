@@ -80,6 +80,11 @@ find "${LIB_DEST}" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name 
 if [[ -d "${LIB_DEST}/NymVPNLibUniffi.xcframework" && ! -d "${LIB_DEST}/ByVpnCoreUniffi.xcframework" ]]; then
   mv "${LIB_DEST}/NymVPNLibUniffi.xcframework" "${LIB_DEST}/ByVpnCoreUniffi.xcframework"
 fi
+# SPM expects Sources/<target>; cargo-swift emits Sources/NymVPNLib
+if [[ -d "${LIB_DEST}/Sources/NymVPNLib" ]]; then
+  rm -rf "${LIB_DEST}/Sources/ByVpnCore"
+  mv "${LIB_DEST}/Sources/NymVPNLib" "${LIB_DEST}/Sources/ByVpnCore"
+fi
 echo "[BuildCore] Copied/normalized ByVpnCore → ${LIB_DEST}"
 
 # iOS CI: stop before xcodebuild/header-flatten (observed SIGABRT exit 134 on runners).

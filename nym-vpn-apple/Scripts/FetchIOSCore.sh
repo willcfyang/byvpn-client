@@ -132,6 +132,15 @@ normalize_and_copy_core() {
     sed -i 's/name: "NymVPNLib"/name: "ByVpnCore"/g' "$src/Package.swift" 2>/dev/null || true
   fi
 
+  # SPM expects Sources/<target>; upstream zip uses Sources/NymVPNLib
+  if [[ -d "$src/Sources/NymVPNLib" ]]; then
+    rm -rf "$src/Sources/ByVpnCore"
+    mv "$src/Sources/NymVPNLib" "$src/Sources/ByVpnCore"
+  fi
+  if [[ -d "$src/NymVPNLibUniffi.xcframework" && ! -d "$src/ByVpnCoreUniffi.xcframework" ]]; then
+    mv "$src/NymVPNLibUniffi.xcframework" "$src/ByVpnCoreUniffi.xcframework"
+  fi
+
   echo "Copying ByVpnCore into project root (../).."
   rm -rf ../ByVpnCore
   cp -a "$src" ../ByVpnCore

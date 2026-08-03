@@ -1,0 +1,100 @@
+import SwiftUI
+import AppSettings
+import ConnectionTypes
+import CredentialsManager
+import Device
+import ConfigurationManager
+import UIComponents
+import Theme
+
+public struct SettingsView: View {
+    @EnvironmentObject private var credentialsManager: CredentialsManager
+    @StateObject private var viewModel: SettingsViewModel
+#if os(macOS)
+    @State private var autologinState = AutologinState()
+#endif
+
+    public init(viewModel: SettingsViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
+    }
+
+    public var body: some View {
+        SettingsFlowCoordinator(flowState: viewModel, content: content)
+    }
+}
+
+private extension SettingsView {
+    @ViewBuilder
+    func content() -> some View {
+        VStack(spacing: 0) {
+            navbar()
+            ScrollView {
+                VStack(spacing: 0) {
+                    Spacer()
+                        .frame(height: ByVpnSpacing.section)
+                    settingsList()
+                    Spacer()
+                        .frame(height: ByVpnSpacing.section)
+                    appVersionText()
+                        .onTapGesture(count: 3) {
+                            viewModel.navigateToSantasMenu()
+                        }
+                }
+                .padding(.horizontal, ByVpnSpacing.large)
+            }
+            .scrollIndicators(.never)
+            .frame(maxWidth: MagicNumbers.maxWidth)
+        }
+        .navigationBarBackButtonHidden(true)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(edges: [.bottom])
+        .background {
+            Color.ByVpn.background
+                .ignoresSafeArea()
+        }
+#if os(macOS)
+        .autologinOverlay(
+            state: autologinState,
+            onRetry: { autologinState.start(kind: .autologinRenew, using: credentialsManager) }
+        )
+#endif
+        .onAppear {
+#if os(macOS)
+            viewModel.autologinState = autologinState
+#endif
+            Task {
+                await credentialsManager.updateAccountSummary()
+                viewModel.reloadSections()
+            }
+        }
+    }
+
+    @ViewBuilder
+    func navbar() -> some View {
+        CustomNavBar(
+            title: viewModel.settingsTitle,
+            backgroundColorOverride: Color.ByVpn.navBarBackground,
+            leftButton: CustomNavBarButton(type: .empty, action: {}),
+            rightButton: CustomNavBarButton(type: .close, action: { viewModel.navigateBack() })
+        )
+    }
+
+    @ViewBuilder
+    func settingsList() -> some View {
+        SettingsList(viewModel: SettingsListViewModel(sections: viewModel.sections))
+    }
+
+    func appVersionText() -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(viewModel.versionTitle)
+                    .foregroundStyle(Color.ByVpn.textSecondary)
+                    .byVpnTextStyle(.bodySmall)
+                    .padding(.bottom, ByVpnSpacing.large)
+                Spacer()
+            }
+            Spacer()
+                .frame(height: ByVpnSpacing.section)
+        }
+    }
+}

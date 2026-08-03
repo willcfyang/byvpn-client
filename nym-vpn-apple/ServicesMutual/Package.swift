@@ -1,0 +1,84 @@
+// swift-tools-version: 5.10
+// The swift-tools-version declares the minimum version of Swift required to build this package.
+
+import PackageDescription
+
+let package = Package(
+    name: "ServicesMutual",
+    defaultLocalization: "en",
+    platforms: [
+        .iOS(.v17),
+        .macOS(.v14)
+    ],
+    products: [
+        .library(name: "AppVersionProvider", targets: ["AppVersionProvider"]),
+        .library(name: "ConnectionTypes", targets: ["ConnectionTypes"]),
+        .library(name: "Constants", targets: ["Constants"]),
+        .library(name: "DarwinNotificationCenter", targets: ["DarwinNotificationCenter"]),
+        .library(name: "ErrorReason", targets: ["ErrorReason"]),
+        .library(name: "ByVpnLogger", targets: ["ByVpnLogger"]),
+        .library(name: "TunnelStatus", targets: ["TunnelStatus"])
+    ],
+    dependencies: [
+        .package(name: "ByVpnCore", path: "../ByVpnCore"),
+        .package(path: "../ByVpnRpc"),
+        .package(name: "Theme", path: "../Theme"),
+        .package(url: "https://github.com/apple/swift-log", from: "1.5.4")
+    ],
+    targets: [
+        .target(
+            name: "AppVersionProvider",
+            dependencies: [
+                .product(name: "ByVpnCore", package: "ByVpnCore", condition: .when(platforms: [.iOS]))
+            ],
+            path: "Sources/AppVersionProvider"
+        ),
+        .target(
+            name: "ConnectionTypes",
+            dependencies: [
+                .product(name: "ByVpnCore", package: "ByVpnCore", condition: .when(platforms: [.iOS])),
+                .product(name: "ByVpnRpc", package: "ByVpnRpc", condition: .when(platforms: [.macOS])),
+                "Theme"
+            ],
+            path: "Sources/ConnectionTypes"
+        ),
+        .target(
+            name: "Constants",
+            dependencies: [
+                "Theme"
+            ],
+            path: "Sources/Constants"
+        ),
+        .target(
+            name: "DarwinNotificationCenter",
+            dependencies: [
+                "Constants"
+            ],
+            path: "Sources/DarwinNotificationCenter"
+        ),
+        .target(
+            name: "ErrorReason",
+            dependencies: [
+                .product(name: "ByVpnCore", package: "ByVpnCore", condition: .when(platforms: [.iOS])),
+                "Theme"
+            ],
+            path: "Sources/ErrorReason"
+        ),
+        .target(
+            name: "ByVpnLogger",
+            dependencies: [
+                "Constants",
+                "DarwinNotificationCenter",
+                .product(name: "Logging", package: "swift-log")
+            ],
+            path: "Sources/ByVpnLogger"
+        ),
+        .target(
+            name: "TunnelStatus",
+            dependencies: [
+                "ErrorReason"
+            ],
+            path: "Sources/TunnelStatus"
+        )
+    ]
+)

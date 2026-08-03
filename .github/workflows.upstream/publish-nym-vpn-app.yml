@@ -1,0 +1,372 @@
+name: publish-nym-vpn-app
+on:
+  schedule:
+    - cron: "4 4 * * *"
+  workflow_dispatch:
+    inputs:
+      release_type:
+        type: choice
+        description: 'Release type, "stable" for public releases (signed Windows only), "rc" for release candidates (signed Windows only), "nightly" for nightly build, "dev" for any other releases'
+        options:
+          - dev
+          - nightly
+          - rc
+          - stable
+        default: dev
+        required: true
+      pre_release:
+        description: 'Label as "Pre-release"'
+        required: false
+        type: boolean
+        default: false
+      updater:
+        description: "Enable updater (Windows only) and bump metadata (always enabled for stable releases)"
+        required: false
+        type: boolean
+        default: false
+      dev_mode:
+        description: "Enable dev mode (in-app dev menu)"
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  build-linux:
+    uses: ./.github/workflows/build-nym-vpn-app-linux.yml
+    with:
+      dev_mode: ${{ github.event_name == 'schedule' || contains(github.ref_name, 'dev') || contains(github.ref_name, 'nightly') || inputs.dev_mode == true }}
+    secrets: inherit
+  build-windows-x64:
+    uses: ./.github/workflows/build-nym-vpn-app-windows.yml
+    with:
+      cpu_arch: x64
+      dev_mode: ${{ github.event_name == 'schedule' || contains(github.ref_name, 'dev') || contains(github.ref_name, 'nightly') || inputs.dev_mode == true  }}
+      core_build_it: true
+      sign: ${{ inputs.release_type == 'stable' || inputs.release_type == 'rc' }}
+      updater_bundle: ${{ inputs.updater == true || inputs.release_type == 'stable' }}
+      updater_channel: ${{ inputs.release_type == 'stable' && 'stable' || 'dev' }}
+    secrets: inherit
+
+  build-windows-arm64:
+    uses: ./.github/workflows/build-nym-vpn-app-windows.yml
+    with:
+      cpu_arch: ARM64
+      dev_mode: ${{ github.event_name == 'schedule' || contains(github.ref_name, 'dev') || contains(github.ref_name, 'nightly') || inputs.dev_mode == true  }}
+      core_build_it: true
+      sign: ${{ inputs.release_type == 'stable' || inputs.release_type == 'rc' }}
+      updater_bundle: ${{ inputs.updater == true || inputs.release_type == 'stable' }}
+      updater_channel: ${{ inputs.release_type == 'stable' && 'stable' || 'dev' }}
+    secrets: inherit
+
+  generate-build-info-nym-vpn-app:
+    uses: ./.github/workflows/generate-build-info-nym-vpn-app.yml
+    needs: build-linux
+    with:
+      build-profile: release
+
+  publish:
+    needs:
+      - build-linux
+      - build-windows-x64
+      - build-windows-arm64
+      - generate-build-info-nym-vpn-app
+    runs-on: arc-linux-latest
+    outputs:
+      release_tag: ${{ steps.set_tag.outputs.tag }}
+      release_id: ${{ steps.create_release.outputs.id }}
+      version: ${{ steps.cargo-get.outputs.metadata }}
+      win_updater_x64_exe: ${{ steps.win_updater_x64.outputs.exe }}
+      win_updater_x64_sig: ${{ steps.win_updater_x64.outputs.sig }}
+      win_updater_arm64_exe: ${{ steps.win_updater_arm64.outputs.exe }}
+      win_updater_arm64_sig: ${{ steps.win_updater_arm64.outputs.sig }}
+      core_build_url_path: ${{ needs.build-windows-x64.outputs.core_build_url_path }}
+    env:
+      # stable | nightly | dev
+      RELEASE_TYPE: ${{ inputs.release_type || (github.event_name == 'schedule' && 'nightly' || 'dev') }}
+      # GH needed for gh cli
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      UPLOAD_DIR_LINUX_X86_64: linux_artifacts_x86_64
+      UPLOAD_DIR_LINUX_AARCH64: linux_artifacts_aarch64
+      UPLOAD_DIR_WINDOWS_X64: ${{ needs.build-windows-x64.outputs.UPLOAD_DIR_WINDOWS }}
+      UPLOAD_DIR_WINDOWS_ARM64: ${{ needs.build-windows-arm64.outputs.UPLOAD_DIR_WINDOWS }}
+      UPDATER_ENABLED: ${{ inputs.updater == true || inputs.release_type == 'stable' }}
+    permissions: write-all
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Dotenv Action
+        uses: xom9ikk/dotenv@v2.4.0
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+
+      - name: Get package version
+        id: cargo-get
+        uses: nicolaiunrein/cargo-get@master
+        with:
+          subcommand: package.version --entry nym-vpn-app/src-tauri
+
+      - name: Check tag name consistency
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          if [[ nym-vpn-app-v${{ steps.cargo-get.outputs.metadata }} != ${{ github.ref_name }} ]]; then
+            exit 1
+          fi
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+
+      # Setup TAG_NAME
+      - if: github.event_name == 'workflow_dispatch'
+        run: echo "TAG_NAME=nym-vpn-app-v${{ steps.cargo-get.outputs.metadata }}" >> $GITHUB_ENV
+      - if: ${{ env.RELEASE_TYPE == 'nightly' }}
+        run: echo "TAG_NAME=nym-vpn-app-nightly" >> $GITHUB_ENV
+      - if: github.event_name == 'push'
+        run: echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Set output 'tag'
+        id: set_tag
+        run: echo "tag=${{ env.TAG_NAME }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set output for updater (Windows x64)
+        if: ${{ env.UPDATER_ENABLED == 'true' }}
+        id: win_updater_x64
+        working-directory: ${{ env.UPLOAD_DIR_WINDOWS_X64 }}
+        run: |
+          shopt -s failglob
+          exe=(*setup.exe)
+          echo "exe=${exe[0]}" >> "$GITHUB_OUTPUT"
+          sig=$(head -n 1 *.exe.sig)
+          echo "sig=$sig" >> "$GITHUB_OUTPUT"
+
+      - name: Set output for updater (Windows ARM64)
+        if: ${{ env.UPDATER_ENABLED == 'true' }}
+        id: win_updater_arm64
+        working-directory: ${{ env.UPLOAD_DIR_WINDOWS_ARM64 }}
+        run: |
+          shopt -s failglob
+          exe=(*setup.exe)
+          echo "exe=${exe[0]}" >> "$GITHUB_OUTPUT"
+          sig=$(head -n 1 *.exe.sig)
+          echo "sig=$sig" >> "$GITHUB_OUTPUT"
+
+      - name: Remove previous nightly release
+        if: ${{ env.RELEASE_TYPE == 'nightly' }}
+        run: |
+          gh release delete nym-vpn-app-nightly --yes || true
+          git push origin :nym-vpn-app-nightly || true
+
+      - name: Generate checksums
+        run: |
+          pushd ${{ env.UPLOAD_DIR_LINUX_X86_64 }} || exit 1
+            for f in *; do sha256sum "$f" > "$f.sha256sum"; done
+          popd
+
+          pushd ${{ env.UPLOAD_DIR_LINUX_AARCH64 }} || exit 1
+            for f in *; do sha256sum "$f" > "$f.sha256sum"; done
+          popd
+
+          pushd ${{ env.UPLOAD_DIR_WINDOWS_X64 }} || exit 1
+            exe=(*setup.exe)
+            sha256sum "${exe[0]}" > "${exe[0]}.sha256sum";
+          popd
+
+          pushd ${{ env.UPLOAD_DIR_WINDOWS_ARM64 }} || exit 1
+            exe=(*setup.exe)
+            sha256sum "${exe[0]}" > "${exe[0]}.sha256sum";
+          popd
+
+          echo 'SHA256SUMS<<EOF' >> $GITHUB_ENV
+          cat ${{ env.UPLOAD_DIR_LINUX_X86_64 }}/*.sha256sum >> $GITHUB_ENV
+          cat ${{ env.UPLOAD_DIR_LINUX_AARCH64 }}/*.sha256sum >> $GITHUB_ENV
+          cat ${{ env.UPLOAD_DIR_WINDOWS_X64 }}/*.sha256sum >> $GITHUB_ENV
+          cat ${{ env.UPLOAD_DIR_WINDOWS_ARM64 }}/*.sha256sum >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Build info
+        run: |
+          echo 'BUILD_INFO<<EOF' >> $GITHUB_ENV
+          cat build-info/build-info.txt >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Set release notes header (stable)
+        if: ${{ env.RELEASE_TYPE == 'stable' }}
+        env:
+          EMOJI: ":ship:"
+        run: echo "RELEASE_NOTES_HEADER='$EMOJI Linux and Windows desktop app'" >> $GITHUB_ENV
+
+      - name: Set release notes header (dev + rc)
+        if: ${{ env.RELEASE_TYPE == 'dev' || env.RELEASE_TYPE == 'rc' }}
+        env:
+          EMOJI: ":hammer_and_wrench:"
+        run: echo "RELEASE_NOTES_HEADER='$EMOJI Linux and Windows desktop app, **dev** build'" >> $GITHUB_ENV
+
+      - name: Set release notes header (nightly)
+        if: ${{ env.RELEASE_TYPE == 'nightly' }}
+        env:
+          EMOJI: ":night_with_stars:"
+        run: echo "RELEASE_NOTES_HEADER='$EMOJI Linux and Windows desktop app, **nightly** build'" >> $GITHUB_ENV
+
+      - name: Release notes
+        run: |
+          {
+            echo 'RELEASE_NOTES<<EOF'
+            echo '${{ env.RELEASE_NOTES_HEADER }}
+
+          ```
+          ${{ env.BUILD_INFO }}
+          ```
+
+          [CHANGELOG](https://github.com/nymtech/nym-vpn-client/blob/develop/nym-vpn-app/CHANGELOG.md)
+          '
+            echo EOF
+          } >> "$GITHUB_ENV"
+
+      - name: Create release
+        id: create_release
+        if: ${{ env.RELEASE_TYPE != 'dev' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: ${{ env.RELEASE_NOTES }}
+          tag_name: ${{ env.TAG_NAME }}
+          name: ${{ env.TAG_NAME }}
+          draft: false
+          make_latest: ${{ env.RELEASE_TYPE == 'stable' }}
+          prerelease: ${{ env.RELEASE_TYPE != 'stable' || inputs.pre_release }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            ${{ env.UPLOAD_DIR_LINUX_X86_64 }}/*
+            ${{ env.UPLOAD_DIR_LINUX_AARCH64 }}/*
+            ${{ env.UPLOAD_DIR_WINDOWS_X64 }}/*
+            ${{ env.UPLOAD_DIR_WINDOWS_ARM64 }}/*
+
+  windows-updater:
+    uses: ./.github/workflows/tauri-updater.yml
+    needs: publish
+    if: ${{ inputs.updater == true || inputs.release_type == 'stable' }}
+    with:
+      channel: ${{ inputs.release_type == 'stable' && 'stable' || 'dev' }}
+      version: ${{ needs.publish.outputs.version }}
+      base_url: https://github.com/nymtech/nym-vpn-client/releases/download/${{ needs.publish.outputs.release_tag }}
+      signature_x64: ${{ needs.publish.outputs.win_updater_x64_sig }}
+      signature_arm64: ${{ needs.publish.outputs.win_updater_arm64_sig }}
+
+  update-aur-app:
+    uses: ./.github/workflows/publish-aur-nym-vpn-app.yml
+    needs: publish
+    if: ${{ inputs.release_type == 'stable' }}
+    with:
+      release_tag: ${{ needs.publish.outputs.release_tag }}
+      pkgrel: 1
+      publish_aur: true
+      commit_msg: "v${{ needs.publish.outputs.version }}"
+    secrets: inherit
+
+  update-aur-vpnd:
+    uses: ./.github/workflows/publish-aur-nym-vpnd.yml
+    needs: publish
+    if: ${{ inputs.release_type == 'stable' && inputs.core_release_tag }}
+    with:
+      release_tag: ${{ inputs.core_release_tag }}
+      pkgrel: 1
+      publish_aur: true
+      commit_msg: "release ${{ inputs.core_release_tag }}"
+    secrets: inherit
+
+  post-release:
+    uses: ./.github/workflows/tauri-post-release.yml
+    needs: publish
+    if: ${{ inputs.release_type == 'stable' }}
+    with:
+      release_tag: ${{ needs.publish.outputs.release_tag }}
+      version: ${{ needs.publish.outputs.version }}
+      core_release_tag: ${{ inputs.core_release_tag }}
+
+  zulip-notify:
+    runs-on: arc-linux-latest
+    needs: publish
+    continue-on-error: true
+    env:
+      # stable | nightly | dev
+      RELEASE_TYPE: ${{ inputs.release_type || (github.event_name == 'schedule' && 'nightly' || 'dev') }}
+    steps:
+      - name: Set topic
+        # tauri-release | tauri-dev
+        run: |
+          topic=${{ inputs.release_type == 'stable' && 'tauri-release' || 'tauri-dev' }}
+          echo $topic
+          echo "TOPIC=$topic" >> "$GITHUB_ENV"
+
+      - name: Set vpn-core link
+        env:
+          NYM_BUILDS_URL: "https://${{ secrets.CI_WWW_REMOTE_HOST }}/nym-vpn-client/nym-vpn-core"
+          core_build_url_path: "${{ needs.publish.outputs.core_build_url_path }}"
+        run: |
+          if [[ -n "${{ inputs.core_release_tag }}" ]]; then
+            url=https://github.com/nymtech/nym-vpn-client/releases/tag/${{ inputs.core_release_tag }}
+          elif [[ -n "${{ inputs.core_artifact_url }}" ]]; then
+            url="$(dirname ${{ inputs.core_artifact_url }})/"
+          elif [[ -n "$core_build_url_path" ]]; then
+            url="${{ env.NYM_BUILDS_URL }}${{ env.core_build_url_path }}/"
+          elif [[ "${{ env.RELEASE_TYPE }}" == "dev" ]]; then
+            url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          else
+            latest=$(curl -sSL "${{ env.NYM_BUILDS_URL }}/develop/" | grep -oP '(?<=href=")\d+(?=/)' | sort -rn | head -1)
+            if [[ -n "$latest" ]]; then
+              url="${{ env.NYM_BUILDS_URL }}/develop/$latest/"
+            else
+              url="${{ env.NYM_BUILDS_URL }}/develop/"
+            fi
+          fi
+          echo "CORE_LINK=$url" >> "$GITHUB_ENV"
+
+      - name: Set app link
+        run: |
+          if [[ "${{ env.RELEASE_TYPE }}" == "dev" ]]; then
+            url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          else
+            url="https://github.com/nymtech/nym-vpn-client/releases/tag/${{ needs.publish.outputs.release_tag }}"
+          fi
+          echo "APP_LINK=$url" >> "$GITHUB_ENV"
+
+      - name: Set message
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+          EMOJI: ${{ (env.RELEASE_TYPE == 'stable' && ':ship:') || (env.RELEASE_TYPE == 'nightly' && ':night:') || ':hammer_and_wrench:' }}
+          NAME: ${{ env.RELEASE_TYPE == 'stable' && 'release' || (env.RELEASE_TYPE == 'nightly' && 'nightly build') || 'dev build' }}
+        run: |
+          {
+            echo 'MESSAGE<<EOF'
+            echo '${{ env.EMOJI }} **${{ env.NAME }}** `${{ env.VERSION }}`
+          [app](${{ env.APP_LINK }}) | [core](${{ env.CORE_LINK }})
+          '
+            echo EOF
+          } >> "$GITHUB_ENV"
+
+      - name: Send Zulip message
+        uses: zulip/github-actions-zulip/send-message@v1
+        with:
+          api-key: ${{ secrets.ZULIP_APE_BOT_API_KEY }}
+          email: ${{ secrets.ZULIP_APE_BOT_EMAIL }}
+          organization-url: ${{ secrets.ZULIP_EXTERNALS_ORG_URL }}
+          to: "24"
+          type: "stream"
+          topic: ${{ env.TOPIC }}
+          content: ${{ env.MESSAGE }}
+
+  gen-hashes:
+    uses: ./.github/workflows/gen-hashes-json.yml
+    needs: publish
+    if: ${{ inputs.release_type == 'stable' }}
+    with:
+      release_tag: ${{ needs.publish.outputs.release_tag }}
+    secrets: inherit

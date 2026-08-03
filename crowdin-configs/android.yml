@@ -1,0 +1,52 @@
+project_id_env: CROWDIN_PROJECT_ID
+api_token_env: CROWDIN_PERSONAL_TOKEN
+base_path: "../"
+preserve_hierarchy: true
+languages_mapping:
+  # Mapping for Android Resource Folders (res/values-*)
+  android_code: &android-code
+    ar: ar
+    bn: bn-rBD
+    de: de
+    es-ES: es
+    fa: fa
+    fr: fr
+    hi: hi
+    pt-BR: pt-rBR
+    ru: ru
+    tr: tr
+    uk: uk
+    vi: vi-rVN
+    zh-CN: zh-rCN
+  # Mapping for Fastlane / Google Play Store Metadata
+  locale: &play-locale
+    ar: ar
+    bn: bn-BD
+    de: de-DE
+    en-US: en-US
+    es-ES: es-ES
+    fa: fa
+    fr: fr-FR
+    hi: hi-IN
+    pt-BR: pt-BR
+    ru: ru-RU
+    tr: tr-TR
+    uk: uk
+    vi: vi
+    zh-CN: zh-CN
+files:
+  - source: "nym-vpn-android/app/src/main/res/values/strings.xml"
+    translation: "nym-vpn-android/app/src/main/res/values-%android_code%/strings.xml"
+    languages_mapping: { android_code: *android-code }
+  - source: "nym-vpn-android/core/src/main/res/values/strings.xml"
+    translation: "nym-vpn-android/core/src/main/res/values-%android_code%/strings.xml"
+    languages_mapping: { android_code: *android-code }
+  - source: "fastlane/metadata/android/en-US/changelogs/*.txt"
+    translation: "fastlane/metadata/android/%locale%/changelogs/%original_file_name%"
+    languages_mapping: { locale: *play-locale }
+  # Translate all .txt files except video.txt
+  - source: "fastlane/metadata/android/en-US/*.txt"
+    ignore:
+      - "fastlane/metadata/android/en-US/video.txt"
+    translation: "fastlane/metadata/android/%locale%/%original_file_name%"
+    languages_mapping: { locale: *play-locale }

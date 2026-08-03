@@ -1,0 +1,298 @@
+import SwiftUI
+import Constants
+import ConnectionTypes
+import ExternalLinkManager
+import Routes
+import Settings
+import Theme
+import UIComponents
+
+public struct GatewaysView: View {
+    @ObservedObject private var viewModel: GatewaysViewModel
+    @FocusState private var isSearchFocused: Bool
+
+    private var entryGatewayBinding: Binding<EntryGateway> {
+        Binding(
+            get: { viewModel.connectionManager.entryGateway },
+            set: { viewModel.connectionManager.setEntryGateway($0) }
+        )
+    }
+
+    private var exitRouterBinding: Binding<ExitRouter> {
+        Binding(
+            get: { viewModel.connectionManager.exitRouter },
+            set: { viewModel.connectionManager.setExitGateway($0) }
+        )
+    }
+
+    public init(viewModel: GatewaysViewModel) {
+        self.viewModel = viewModel
+    }
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            navbar()
+            optionalQuicMessage()
+            Spacer()
+                .frame(height: 24)
+            searchView()
+                .frame(maxWidth: MagicNumbers.maxWidth)
+            Spacer()
+                .frame(height: 16)
+            countSummaryHeader()
+                .frame(maxWidth: MagicNumbers.maxWidth)
+            Spacer()
+                .frame(height: 12)
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    countriesGatewaysList()
+                    noSearchResultsView()
+                    foundCountriesList()
+                    foundRegionsList()
+                    foundGatewaysList()
+                }
+                .scrollDismissesKeyboard(.immediately)
+                .scrollIndicators(.never)
+                .frame(maxWidth: MagicNumbers.maxWidth)
+                .ignoresSafeArea(.all)
+                .onReceive(viewModel.$shouldScroll.filter { $0 }) { _ in
+                    Task { @MainActor in
+                        await Task.yield() // let SwiftUI lay out with the new data
+                        withAnimation {
+                            proxy.scrollTo(viewModel.scrollToModel.scrollToIdentifier, anchor: .top)
+                        }
+                        viewModel.shouldScroll = false
+                    }
+                }
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            Color.ByVpn.background
+                .ignoresSafeArea()
+        }
+        .overlay {
+            if viewModel.isGeolocationModalDisplayed {
+                LocationInfoView(type: viewModel.type, isDisplayed: $viewModel.isGeolocationModalDisplayed)
+                    .transition(.opacity)
+                    .animation(.easeInOut, value: viewModel.isGeolocationModalDisplayed)
+            }
+        }
+        .onTapGesture {
+            isSearchFocused = false
+        }
+        .onAppear {
+            isSearchFocused = true
+        }
+    }
+}
+
+private extension GatewaysView {
+    func navbar() -> some View {
+        CustomNavBar(
+            title: viewModel.type.hopLocalizedTitle,
+            leftButton: CustomNavBarButton(type: .back, action: { viewModel.navigateHome() }),
+            rightButton: CustomNavBarButton(type: .info, action: { viewModel.displayInfoTooltip() })
+        )
+    }
+
+    @ViewBuilder
+    func optionalQuicMessage() -> some View {
+        if viewModel.shouldShowQuic {
+            Spacer()
+                .frame(height: 24)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 0) {
+                    Text(quicText())
+                        .foregroundStyle(Color.ByVpn.textSecondary)
+                        .byVpnTextStyle(.bodySmall)
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: MagicNumbers.maxWidth)
+            .environment(\.openURL, OpenURLAction { url in
+                if url == URL(string: "app://enable-quic") {
+                    viewModel.path.append(HomeLink.settings)
+                    viewModel.path.append(SettingLink.censorship)
+                    return .handled
+                }
+                return .systemAction
+            })
+        }
+    }
+
+    func quicText() -> AttributedString {
+        let first = AttributedString("gatewaysView.quic1".localizedString)
+        var secondAttr = AttributedString("gatewaysView.quic2".localizedString)
+        secondAttr.underlineStyle = .single
+        secondAttr.foregroundColor = Color.ByVpn.textPrimary
+        secondAttr.link = URL(string: "app://enable-quic")
+        return first + AttributedString(" ") + secondAttr
+    }
+
+    func searchView() -> some View {
+        SearchView(searchText: $viewModel.searchText, isSearchFocused: $isSearchFocused)
+            .padding(.horizontal, 16)
+    }
+
+    @ViewBuilder
+    func countSummaryHeader() -> some View {
+        let countriesCount = viewModel.countries.count
+        let nodesCount = viewModel.gateways.count
+        if countriesCount > 0 {
+            HStack(spacing: 0) {
+                Text("\(countriesCount) \("gatewaysView.countries".localizedString) · \(nodesCount) \("gatewaysView.nodes".localizedString)")
+                    .foregroundStyle(Color.ByVpn.textSecondary)
+                    .byVpnTextStyle(.bodySmall)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    @ViewBuilder
+    func countriesGatewaysList() -> some View {
+        if viewModel.searchText.count < viewModel.minimumSearchSymbols {
+            ForEach(viewModel.countries, id: \.name) { country in
+                let servers = viewModel.gatewaysInCountry(with: country.code)
+                if !servers.isEmpty {
+                    GatewayCountryCell(
+                        country: country,
+                        servers: servers,
+                        type: viewModel.type,
+                        path: $viewModel.path,
+                        scrollToModel: $viewModel.scrollToModel,
+                        entryGateway: entryGatewayBinding,
+                        exitRouter: exitRouterBinding,
+                        infoButtonTapCompletion: { gateway in
+                            viewModel.path.append(HomeLink.gatewayDetails(gateway: gateway, hopType: viewModel.type))
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    func noSearchResultsView() -> some View {
+        if viewModel.searchText.count >= viewModel.minimumSearchSymbols,
+           viewModel.foundGateways.isEmpty,
+           viewModel.foundCountries.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("search.noResults".localizedString)
+                    .foregroundStyle(Color.ByVpn.textPrimary)
+                    .byVpnTextStyle(.bodyLarge)
+                Spacer()
+                    .frame(height: 16)
+                Text("search.noResultsSubtitle".localizedString)
+                    .foregroundStyle(Color.ByVpn.textSecondary)
+                    .byVpnTextStyle(.bodyLarge)
+                Spacer()
+                    .frame(height: 8)
+
+                contactUsForHelpLinkView()
+                Spacer()
+                    .frame(height: 4)
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    @ViewBuilder
+    func contactUsForHelpLinkView() -> some View {
+        if let attributtedText = contactUsForHelpAttributedString() {
+            Text(attributtedText)
+                .foregroundStyle(Color.ByVpn.textSecondary)
+                .byVpnTextStyle(.bodyLarge)
+        }
+    }
+
+    func contactUsForHelpAttributedString() -> AttributedString? {
+        guard let newSupportRequestURL = URL(string: Constants.newSupportRequest.rawValue),
+              let operatorURL = URL(string: Constants.operatorDocs.rawValue)
+        else {
+            return nil
+        }
+
+        let contactUs = "search.contactUsForHelp".localizedString
+        let orText = "search.or".localizedString
+        let howToRun = "search.howToRunGateway".localizedString
+        let markdown = "[\(contactUs)](\(newSupportRequestURL.absoluteString)) \(orText) [\(howToRun)](\(operatorURL.absoluteString))."
+
+        let options = AttributedString.MarkdownParsingOptions(
+            interpretedSyntax: .inlineOnlyPreservingWhitespace
+        )
+
+        guard var attributed = try? AttributedString(markdown: markdown, options: options)
+        else {
+            return nil
+        }
+
+        for run in attributed.runs where run.link != nil {
+            attributed[run.range].underlineStyle = .single
+            attributed[run.range].foregroundColor = Color.ByVpn.textSecondary
+        }
+        return attributed
+    }
+
+    @ViewBuilder
+    func foundCountriesList() -> some View {
+        ForEach(viewModel.foundCountries, id: \.name) { country in
+            let servers = viewModel.gatewaysInCountry(with: country.code)
+            if !servers.isEmpty {
+                GatewayCountryCell(
+                    country: country,
+                    servers: servers,
+                    type: viewModel.type,
+                    path: $viewModel.path,
+                    scrollToModel: $viewModel.scrollToModel,
+                    entryGateway: entryGatewayBinding,
+                    exitRouter: exitRouterBinding,
+                    infoButtonTapCompletion: { gateway in
+                        viewModel.path.append(HomeLink.gatewayDetails(gateway: gateway, hopType: viewModel.type))
+                    },
+                    isSearching: true
+                )
+            }
+        }
+        Spacer()
+            .frame(height: 24)
+    }
+
+    func foundGatewaysList() -> some View {
+        ForEach(viewModel.foundGateways, id: \.id) { server in
+            GatewayCell(
+                server: server,
+                type: viewModel.type,
+                path: $viewModel.path,
+                scrollToModel: .constant(.empty),
+                isSearching: true,
+                infoButtonTapCompletion: { gateway in
+                    viewModel.path.append(HomeLink.gatewayDetails(gateway: gateway, hopType: viewModel.type))
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    func foundRegionsList() -> some View {
+        ForEach(viewModel.foundRegions, id: \.region) { (country: ByVpnCountry, region: String) in
+            let servers = viewModel.gateways.filter { $0.location?.region == region }
+            if !servers.isEmpty {
+                GatewayRegionCell(
+                    hopType: viewModel.type,
+                    country: country,
+                    region: region,
+                    servers: servers,
+                    infoButtonTapCompletion: { _ in },
+                    path: $viewModel.path,
+                    entryGateway: entryGatewayBinding,
+                    exitRouter: exitRouterBinding,
+                    scrollToModel: .constant(.empty)
+                )
+            }
+        }
+    }
+}

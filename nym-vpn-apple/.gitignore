@@ -1,0 +1,33 @@
+## User settings
+xcuserdata/
+
+## Obj-C/Swift specific
+*.hmap
+
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Swift Package Manager
+Package.resolved
+.swiftpm/
+xcshareddata/swiftpm/
+
+.build/
+
+NymVPNLib
+NymVPNRpc
+
+NymVPND/nym-vpnd
+NymVPND/nym-setup
+NymVPND/nym-socks5-proxy
+
+fastlane/report.xml
+fastlane/README.md
+
+.sentryclirc

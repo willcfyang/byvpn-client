@@ -1,0 +1,74 @@
+7 day free trial: All features, no ads, cancel anytime. Plans starting at $2.39 / month.
+
+इकलौता VPN जो आपकी जासूसी नहीं कर सकता स्विट्ज़रलैंड में निर्मित। गोपनीयता के समर्थकों द्वारा बनाया गया। The world's first mixnet for online anonymity.
+
+- NO-NAME SIGNUP: No email required. Zero-knowledge अकाउंट। किसी भी VPN के मुक़ाबले सबसे अधिक crypto स्वीकृत पूर्ण गुमनामी के लिए नकद भुगतान स्वीकृत।
+- DECENTRALIZED VPN technology
+- MOST CRYPTOCURRENCIES ACCEPTED of any VPN
+- 70+ COUNTRIES with hundreds of independent servers
+- UP TO 10 DEVICES with one anonymous code
+
+### BROWSE WITHOUT A TRACE
+
+Tired of wondering who's watching you? क्या कंपनियाँ आपका व्यक्तिगत डेटा एकत्र कर रही हैं? क्या आप अपनी लोकेशन की वजह से जानकारी तक पहुँच नहीं पा रहे हैं?
+
+While other VPNs promise not to keep logs, with NymVPN there is no point on the decentralized network that can connect your IP address with what you do online. आपकी गोपनीयता डिफ़ॉल्ट रूप से सुनिश्चित है। Your online activity cannot be tied back to you by advertisers, network operators, or centralized infrastructure. You can browse and communicate without leaving a data trail  across the internet.
+
+### CHOOSE YOUR PRIVACY LEVEL
+
+Fast Mode
+
+- High-speed browsing and streaming
+- 2-hop decentralized VPN
+- AmneziaWG (WireGuard) protection
+
+अनॉनिमस मोड
+
+- Maximum anonymity for messaging, email, and financial transactions
+- 5-hop Noise Generating Mixnet
+- Resists advanced traffic analysis
+
+### ESSENTIAL FEATURES
+
+- Entry & exit server selection
+- Multi-layer encryption
+- dVPN AmneziaWG (WireGuard) support
+- Kill switch prevents data leaks
+- Advanced anti-censorship technology
+- स्प्लिट टनलिंग
+- Custom DNS
+- Key rotation for cryptographic security
+- Completely ad-free experience
+- 100% open source software
+
+### WHY NYMVPN IS DIFFERENT
+
+Most VPNs rely on centralized servers and ask you to trust their "no-logs" promises. NymVPN को अलग तरीके से बनाया गया है।
+
+- Decentralized VPN (dVPN) architecture: Traffic is routed through independently operated servers. No one can see both who you are and what you do online.
+
+- Metadata protection: NymVPN protects traffic patterns, timing, and routing information. एन्क्रिप्टेड डेटा भी मेटाडेटा लीक कर सकता है। Nym prevents that.
+
+- Two privacy modes, one app: The FAST  mode uses a high-performance 2-hop decentralized VPN. The ANONYMOUS  mode uses a 5-hop mixnet for maximum anonymity.
+
+- Noise Generating Mixnet technology: Your traffic is mixed with cover traffic, making correlation and AI-driven traffic analysis extremely difficult.
+
+डिज़ाइन से zero-knowledge अकाउंट: ईमेल साइनअप की आवश्यकता नहीं। कोई व्यक्तिगत डेटा नहीं। अकाउंट उपयोग से जोड़े नहीं जा सकते। पूर्ण गुमनामी के लिए क्रिप्टो और नकद भुगतान का समर्थन करता है।
+
+सेंसरशिप-प्रतिरोधी नेटवर्किंग: AmneziaWG, QUIC और stealth ट्रांसपोर्ट विकल्पों के साथ बनाया गया, ताकि प्रतिबंधित वातावरण में भी काम कर सके।
+
+- Open-source and independently audited.
+- Built by academic cryptographers
+
+### NYMVPN IS PERFECT FOR:
+
+- Streaming and browsing without being tracked
+- Secure public WiFi connections
+- Anyone in restrictive countries needing reliable access
+- People who want true anonymity, not just hidden IP addresses
+- Journalists and activists needing untraceable communication
+- Featured in PCMag, TechRadar, Forbes, Bloomberg, Tom's Guide
+
+अभी डाउनलोड करें अनॉनिमस रूप से साइन अप करें। NymVPN के साथ 
+
+उपयोग की शर्तें: https://nym.com/vpn-terms

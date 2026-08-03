@@ -1,0 +1,759 @@
+#!/bin/bash
+
+# NymVPN installer combo
+#
+# Install the following components:
+# - daemon (nym-vpnd) as a systemd service
+# - client app (nym-vpn-app)
+#
+# On deb based systems, the script installs the deb packages.
+# Otherwise it installs vpnd raw binary and app's AppImage.
+# To force raw install run `INSTALL_TYPE=raw ./install`.
+#
+# By default, the script installs the latest stable build.
+# To install latest nightly/dev builds, run
+# `BUILD_CHANNEL=dev ./install`
+#
+# To uninstall, run
+# `./install uninstall`
+
+set -E
+set -o pipefail
+# catch errors
+trap 'catch $? ${FUNCNAME[0]:-main} $LINENO' ERR
+cwd=$(pwd)
+
+# ANSI style codes
+RED="\e[38;5;1m" # red
+GRN="\e[38;5;2m" # green
+YLW="\e[38;5;3m" # yellow
+MGT="\e[38;5;5m" # magenta
+GRY="\e[38;5;8m" # gray
+BLD="\e[1m"      # bold
+ITL="\e[3m"      # italic
+RS="\e[0m"       # style reset
+B_RED="$BLD$RED"
+B_GRN="$BLD$GRN"
+B_YLW="$BLD$YLW"
+B_MGT="$BLD$MGT"
+I_YLW="$ITL$YLW"
+B_GRY="$BLD$GRY"
+I_GRY="$ITL$GRY"
+BI_GRN="$ITL$B_GRN"
+BI_YLW="$ITL$B_YLW"
+BI_GRY="$ITL$B_GRY"
+BI="$ITL$BLD"
+BI_MGT="$ITL$B_MGT"
+####
+
+BUILD_CHANNEL=${BUILD_CHANNEL:-stable}
+# these are only used when BUILD_CHANNEL=dev
+APP_RELEASE=${APP_RELEASE:-"nym-vpn-app-nightly"}
+CORE_BUILD=${CORE_BUILD:-0}
+
+# detect CPU architecture
+_uname_arch=$(uname -m)
+case "$_uname_arch" in
+x86_64)
+  arch=x86_64
+  deb_arch=amd64
+  app_image_arch=amd64
+  ;;
+aarch64)
+  arch=aarch64
+  deb_arch=arm64
+  app_image_arch=aarch64
+  ;;
+*)
+  echo "Unsupported architecture: $_uname_arch" >&2
+  exit 1
+  ;;
+esac
+
+## STABLE BUILDS #################################################
+# app artifacts
+app_tag=nym-vpn-app-v1.29.4
+app_version=1.29.4
+appimage_url="https://github.com/nymtech/nym-vpn-client/releases/download/$app_tag/NymVPN_${app_version}_${app_image_arch}.AppImage"
+app_deb_url="https://github.com/nymtech/nym-vpn-client/releases/download/$app_tag/nym-vpn-app_${app_version}_${deb_arch}.deb"
+desktop_url="https://raw.githubusercontent.com/nymtech/nym-vpn-client/ac4153bb1/nym-vpn-app/.pkg/app.desktop"
+icon_url="https://raw.githubusercontent.com/nymtech/nym-vpn-client/fb526935/nym-vpn-app/.pkg/icon.svg"
+
+# nym-vpnd artifacts
+vpnd_tag=nym-vpn-core-v1.29.3
+# ⚠ there are inconsistencies in the package version naming…
+vpnd_version=1.29.3
+vpnd_deb_ver=$vpnd_version
+vpnd_deb_ver_url=$vpnd_version
+vpnd_raw_url="https://github.com/nymtech/nym-vpn-client/releases/download/$vpnd_tag/nym-vpn-core-v${vpnd_version}_linux_${arch}.tar.gz"
+vpnd_deb_url="https://github.com/nymtech/nym-vpn-client/releases/download/$vpnd_tag/nym-vpnd_${vpnd_deb_ver_url}_${deb_arch}.deb"
+unit_url="https://raw.githubusercontent.com/nymtech/nym-vpn-client/fb526935/nym-vpn-core/crates/nym-vpnd/.pkg/aur/nym-vpnd.service"
+##################################################################
+
+# function called when an error occurs, will print the exit
+# status, function name and line number
+catch() {
+  log_e "$B_RED✗$RS unexpected error, [$BLD$1$RS] $BLD$2$RS L#$BLD$3$RS"
+  cleanup
+  cd "$cwd" || true
+  exit 1
+}
+
+log() {
+  echo -e "$1"
+}
+
+# log to stderr
+log_e() {
+  echo >&2 -e "$1"
+}
+
+# silent pushd that don't print the directory change
+_pushd() {
+  command pushd "$@" >/dev/null || exit 1
+}
+
+# silent popd that don't print the directory change
+_popd() {
+  command popd >/dev/null || exit 1
+}
+
+# check if a command exists
+need_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    log_e " $B_RED⚠$RS need$BLD $1$RS (command not found)"
+    exit 1
+  fi
+}
+
+# replace the HOME directory with '~' in the given path
+tilded() {
+  echo "${1/#$HOME/\~}"
+}
+
+# check if a binary is in the PATH
+# outputs 0 if found, 1 if not found
+bin_in_path() {
+  if which "$1" &>/dev/null; then
+    log "${B_YLW}⚠$RS $1 is present in the system"
+    echo 0
+  fi
+  echo 1
+}
+
+user_prompt() {
+  # check if the script is running in a terminal, if not,
+  # ie. piped into bash read from /dev/tty to get user input
+  if [ -t 0 ]; then
+    read -r -p "$(echo -e "$2")" "$1"
+  else
+    read -r -p "$(echo -e "$2")" "$1" </dev/tty
+  fi
+}
+
+rmfile() {
+  filename="$I_YLW${1/#$HOME/\~}$RS"
+  if [ -f "$1" ]; then
+    rm -f "$1" &>/dev/null || sudo rm -f "$1"
+    log "    removed $filename"
+  elif [ -d "$1" ]; then
+    rm -rf "$1" &>/dev/null || sudo rm -rf "$1"
+    log "    removed $filename"
+  fi
+}
+
+app_id="net.nymtech.vpn"
+data_home=${XDG_DATA_HOME:-$HOME/.local/share}
+state_home=${XDG_STATE_HOME:-$HOME/.local/state}
+config_home=${XDG_CONFIG_HOME:-$HOME/.config}
+cache_home=${XDG_CACHE_HOME:-$HOME/.cache}
+app_dir="nym-vpn-app"
+install_dir="/usr/bin"
+desktop_dir="/usr/share/applications"
+icons_dir="/usr/share/icons/hicolor/scalable/apps"
+appimage="NymVPN_${app_version}_${app_image_arch}.AppImage"
+app_deb="nym-vpn-app_${app_version}_${deb_arch}.deb"
+target_appimage="NymVPN.AppImage"
+core_archive="nym-vpn-core-v${vpnd_version}_linux_${arch}.tar.gz"
+vpnd_bin="nym-vpnd"
+socks5_proxy_bin="nym-socks5-proxy"
+vpnd_service="nym-vpnd.service"
+vpnd_deb="nym-vpnd_${vpnd_deb_ver}_${deb_arch}.deb"
+units_dir="/usr/lib/systemd/system"
+desktop_exec='env RUST_LOG=info,nym_vpn_app=debug NymVPN.AppImage -l %U'
+os=$(uname -a)
+# → to lowercase
+os="${os,,}"
+install_type=raw
+
+# for deb based systems install from deb packages
+[[ -z "$INSTALL_TYPE" ]] &&
+  [[ "$os" == *debian* || "$os" == *ubuntu* || "$os" == *mint* ]] &&
+  install_type=deb
+
+# components to install/uninstall
+# 0 = to be (un)installed
+_vpnd=1
+_app=1
+# system packages to check
+sys_pkgs=()
+
+########################
+app_dev_setup() {
+  app_tag=$APP_RELEASE
+  app_version=$(curl -sSL \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    https://api.github.com/repos/nymtech/nym-vpn-client/releases/tags/"$app_tag" |
+    grep -m1 -oP "(?<=\"name\": \"NymVPN_).+(?=_${app_image_arch}\.AppImage)")
+  appimage_url="https://github.com/nymtech/nym-vpn-client/releases/download/$app_tag/NymVPN_${app_version}_${app_image_arch}.AppImage"
+  app_deb_url="https://github.com/nymtech/nym-vpn-client/releases/download/$app_tag/nym-vpn-app_${app_version}_${deb_arch}.deb"
+  appimage="NymVPN_${app_version}_${app_image_arch}.AppImage"
+  app_deb="nym-vpn-app_${app_version}_${deb_arch}.deb"
+}
+
+get_core_dev() {
+  core_archive=$(curl -s "$1" |
+    grep -oP "(?<=^<a href=\")nym-vpn-core-v.+_linux_${arch}\.tar\.gz(?=\">)")
+  vpnd_raw_url="$1$core_archive"
+  ver="${core_archive#nym-vpn-core-v}"
+  vpnd_version="${ver%_linux_${arch}.tar.gz}"
+}
+
+get_vpnd_dev_deb() {
+  vpnd_deb=$(curl -s "$1" |
+    grep -oP "(?<=^<a href=\")nym-vpnd_.+_${deb_arch}\.deb(?=\">)")
+  ver="${vpnd_deb#nym-vpnd_}"
+  vpnd_deb_ver="${ver%_${deb_arch}.deb}"
+  vpnd_deb_url="$1$vpnd_deb"
+}
+
+vpnd_dev_setup() {
+  if [ "$CORE_BUILD" = 0 ]; then
+    core_build_url=https://builds.ci.nymte.ch/nym-vpn-client/nym-vpn-core/develop/
+    latest=$(curl -s $core_build_url |
+      grep -oP '(?<=<a href=")\d+/' |
+      sort -r |
+      head -n 1)
+    build_url="$core_build_url$latest"
+  else
+    build_url="$CORE_BUILD/"
+  fi
+
+  get_core_dev "$build_url"
+  get_vpnd_dev_deb "$build_url"
+}
+
+dev_setup() {
+  log "${BI_YLW}⚠ dev channel$RS"
+  log "${I_GRY}fetching app release $APP_RELEASE…$RS"
+  app_dev_setup
+  if [ "$CORE_BUILD" = 0 ]; then
+    log "${I_GRY}fetching latest vpn-core dev build…$RS"
+  else
+    log "${I_GRY}fetching vpn-core build…$RS"
+  fi
+  vpnd_dev_setup
+  log
+}
+
+# do not install/uninstall if system packages are installed
+# ⚠ be sure to call `select_components` before this function
+check_system_pkg() {
+  case "$os" in
+  *debian* | *ubuntu* | *mint*)
+    for pkg in "${sys_pkgs[@]}"; do
+      if dpkg-query -W "$pkg"; then
+        log "${B_YLW}⚠$RS $pkg system package is installed, aborting…"
+        exit 1
+      fi
+    done
+    ;;
+  *arch* | *manjaro* | *endeavour* | *garuda*)
+    for pkg in "${sys_pkgs[@]}"; do
+      if pacman -Qs "$pkg"; then
+        log "${B_YLW}⚠$RS $pkg system package is installed, aborting…"
+        exit 1
+      fi
+    done
+    ;;
+  *)
+    return 0
+    ;;
+  esac
+}
+
+select_components() {
+  operation=${1:-install}
+  choice=""
+  log "  ${B_GRN}Select$RS the component(s) to $operation"
+  prompt="    ${BI_YLW}N$RS app and vpnd combo (default)\n    ${BI_YLW}A$RS app only\n    ${BI_YLW}D$RS vpnd only\n(${BI_YLW}N$RS/${BI_YLW}A$RS/${BI_YLW}D$RS) "
+  user_prompt choice "$prompt"
+
+  case "$choice" in
+  a | A)
+    _app=0
+    sys_pkgs+=('nym-vpn-app')
+    ;;
+  d | D)
+    _vpnd=0
+    sys_pkgs+=('nym-vpnd')
+    ;;
+  n | N | '')
+    _vpnd=0
+    _app=0
+    sys_pkgs+=('nym-vpnd' 'nym-vpn-app')
+    ;;
+  *) select_components "$operation" ;;
+  esac
+}
+
+# Download app AppImage and desktop assets
+download_app_appimage() {
+  _pushd "$temp_dir"
+  log "  ${B_GRN}Downloading$RS $appimage"
+  curl -fL -# "$appimage_url" -o "$appimage"
+  log "  ${B_GRN}Downloading$RS $appimage.sha256sum"
+  curl -fL -# "$appimage_url.sha256sum" -o "$appimage.sha256sum"
+  log "  ${B_GRN}Checking$RS sha256sum"
+  sha256sum --check --status "$appimage.sha256sum"
+  log "   ${BI_MGT}ok$RS"
+  log "  ${B_GRN}Downloading$RS app desktop entry"
+  curl -fL -# "$desktop_url" -o app.desktop
+  log "  ${B_GRN}Downloading$RS app icon"
+  curl -fL -# "$icon_url" -o icon.svg
+  _popd
+}
+
+# Download `nym-vpn-app` deb package
+download_app_deb() {
+  _pushd "$temp_dir"
+  log "  ${B_GRN}Downloading$RS $app_deb"
+  curl -fL -# "$app_deb_url" -o "$app_deb"
+  log "  ${B_GRN}Downloading$RS $app_deb.sha256sum"
+  curl -fL -# "$app_deb_url.sha256sum" -o "$app_deb.sha256sum"
+  log "  ${B_GRN}Checking$RS sha256sum"
+  sha256sum --check --status "$app_deb.sha256sum"
+  log "   ${BI_MGT}ok$RS"
+  _popd
+}
+
+# Download `nym-vpnd` prebuilt binary
+download_vpnd_raw() {
+  _pushd "$temp_dir"
+  log "  ${B_GRN}Downloading$RS nym-vpnd archive"
+  curl -fL -# "$vpnd_raw_url" -o "$core_archive"
+  log "  ${B_GRN}Downloading$RS archive sha256sum"
+  curl -fL -# "$vpnd_raw_url.sha256sum" -o "$core_archive.sha256sum"
+  log "  ${B_GRN}Checking$RS sha256sum"
+  sha256sum --check --status "$core_archive.sha256sum"
+  log "   ${BI_MGT}ok$RS"
+  log "  ${B_GRN}Downloading$RS unit file"
+  curl -fL -# "$unit_url" -o nym-vpnd.service
+  log "  ${B_GRN}Unarchiving$RS nym-vpnd"
+  tar -xzf "$core_archive"
+  mv "${core_archive%.tar.gz}/$vpnd_bin" $vpnd_bin
+  mv "${core_archive%.tar.gz}/$socks5_proxy_bin" $socks5_proxy_bin
+  _popd
+}
+
+# Download `nym-vpnd` deb package
+download_vpnd_deb() {
+  _pushd "$temp_dir"
+  log "  ${B_GRN}Downloading$RS $vpnd_deb"
+  curl -fL -# "$vpnd_deb_url" -o "$vpnd_deb"
+  log "  ${B_GRN}Downloading$RS $vpnd_deb.sha256sum"
+  curl -fL -# "$vpnd_deb_url.sha256sum" -o "$vpnd_deb.sha256sum"
+  log "  ${B_GRN}Checking$RS sha256sum"
+  sha256sum --check --status "$vpnd_deb.sha256sum"
+  log "   ${BI_MGT}ok$RS"
+  _popd
+}
+
+# checking if a directory is in the PATH
+dir_in_path() {
+  if [[ ":$PATH:" == *":$1:"* ]]; then
+    return 0
+  fi
+  return 1
+}
+
+# check if a unit exists
+# return 0 if found, 1 if not found
+check_unit() {
+  if systemctl status nym-vpnd &>/dev/null; then
+    return 0
+  else
+    status=$?
+    if [ $status -eq 4 ]; then
+      # exit code 4 means the service is not found
+      return 1
+    fi
+  fi
+  # other exit code mean the service exists
+  return 0
+}
+
+# check for existing installation presence
+sanity_check() {
+  log "  ${B_GRN}Checking$RS for existing installation"
+
+  vpnd_in_path=$(bin_in_path $vpnd_bin)
+  app_in_path=$(bin_in_path $target_appimage)
+
+  # check for any existing installation, if found cancel the script
+  if [[ "$_vpnd" == 0 && $vpnd_in_path == 0 ]] ||
+    [[ "$_app" == 0 && $app_in_path == 0 ]]; then
+    log "  ${I_YLW}Please remove or cleanup any existing installation before running this script$RS"
+    exit 1
+  fi
+
+  files_check=()
+  if [ "$_vpnd" == 0 ]; then
+    files_check+=("$install_dir/$vpnd_bin" "$install_dir/$socks5_proxy_bin" "$units_dir/$vpnd_service")
+  fi
+  if [ "$_app" == 0 ]; then
+    files_check+=("$install_dir/$target_appimage" "$desktop_dir/nym-vpn.desktop" "$icons_dir/nym-vpn.svg")
+  fi
+
+  for file in "${files_check[@]}"; do
+    if [ -a "$file" ]; then
+      log "${B_YLW}⚠$RS $file already exists"
+      log "  ${I_YLW}Please remove or cleanup any existing installation before running this script$RS"
+      exit 1
+    fi
+  done
+
+  if [ "$_vpnd" == 0 ] && check_unit "nym_vpnd"; then
+    log "  ${I_YLW}⚠$RS nym-vpnd unit service found on the system$RS"
+    log "  ${I_YLW}Please remove or cleanup any existing installation before running this script$RS"
+    exit 1
+  fi
+}
+
+# prompt user to enable and start the service
+start_service() {
+  choice=""
+  log "  ${B_GRN}Enable$RS and start nym-vpnd service?"
+  prompt="    ${BI_YLW}Y${RS}es (recommended) ${BI_YLW}N${RS}o "
+  user_prompt choice "$prompt"
+
+  if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+    sudo systemctl enable $vpnd_service &>/dev/null
+    sudo systemctl start $vpnd_service &>/dev/null
+    log "    ${B_GRN}✓$RS service enabled and started"
+  else
+    log "   Run the following commands to enable and start the VPN service:
+    ${I_YLW}sudo systemctl enable $vpnd_service$RS
+    ${I_YLW}sudo systemctl start $vpnd_service$RS"
+  fi
+}
+
+check_system_deps() {
+  log "  ${B_GRN}Checking$RS for system dependencies"
+
+  # this check only applies to the client for now
+  # if client is not selected, skip it
+  if [ "$_app" != 0 ]; then
+    return 0
+  fi
+
+  case "$os" in
+  *ubuntu* | *debian*)
+    # check for ubuntu version > 22.04 libfuse3 (needed for AppImage)
+    fuse_output=$(dpkg --get-selections | grep fuse)
+    if [[ "$fuse_output" != *"libfuse3-3"* ]]; then
+      choice=""
+      log "  ${B_GRN}Install$RS required package libfuse3?"
+      prompt="    ${BI_YLW}Y${RS}es (recommended) ${BI_YLW}N${RS}o "
+      user_prompt choice "$prompt"
+
+      if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+        sudo apt install -y libfuse3-3
+        log "   ${B_GRN}Installed$RS libfuse3"
+      else
+        log "   ${B_YLW}⚠$RS libfuse3 is required for the app to work, install it with:
+        ${I_YLW}sudo apt install libfuse3-3$RS"
+      fi
+    fi
+    ;;
+  *arch* | *manjaro* | *endeavour* | *garuda*)
+    # check if fuse3 is installed (needed for AppImage)
+    if ! pacman -Qk fuse3 &>/dev/null; then
+      choice=""
+      log "  ${B_GRN}Install$RS required package fuse3?"
+      user_prompt choice "    ${BI_YLW}Y${RS}es ${BI_YLW}N${RS}o "
+
+      if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+        sudo pacman -S fuse3 --noconfirm
+        log "   ${B_GRN}Installed$RS fuse3"
+      else
+        log "   ${B_YLW}⚠$RS fuse3 is required for the app to work, install it with:
+        ${I_YLW}sudo pacman -S fuse3$RS"
+      fi
+    fi
+    ;;
+  *)
+    return 0
+    ;;
+  esac
+}
+
+install_app_appimage() {
+  log "  ${B_GRN}Installing$RS NymVPN.AppImage"
+  sudo install -o "$(id -u)" -g "$(id -g)" -Dm755 "$temp_dir/$appimage" "$install_dir/$target_appimage"
+
+  log "  ${B_GRN}Installing$RS desktop entry"
+  _pushd "$temp_dir"
+  sed -i "s|^Exec=.*|Exec=$desktop_exec|" app.desktop
+  _popd
+  sudo install -Dm644 "$temp_dir/app.desktop" "$desktop_dir/nym-vpn.desktop"
+  sudo install -Dm644 "$temp_dir/icon.svg" "$icons_dir/nym-vpn.svg"
+  install -Dm755 -d "$state_home/$app_dir"
+
+  log "  ${B_GRN}Installed$RS files"
+  log "   ${I_YLW}$(tilded "$install_dir/$target_appimage")$RS"
+  log "   ${I_YLW}$(tilded "$desktop_dir/nym-vpn.desktop")$RS"
+  log "   ${I_YLW}$(tilded "$icons_dir/nym-vpn.svg")$RS"
+}
+
+install_app_deb() {
+  log "  ${B_GRN}Installing$RS $app_deb"
+  _pushd "$temp_dir"
+  sudo apt install -y "./$app_deb"
+  _popd
+}
+
+install_vpnd_raw() {
+  log "  ${B_GRN}Installing$RS nym-vpnd"
+  sudo install -o "$(id -u)" -g "$(id -g)" -Dm755 "$temp_dir/$vpnd_bin" "$install_dir/$vpnd_bin"
+  sudo install -o "$(id -u)" -g "$(id -g)" -Dm755 "$temp_dir/$socks5_proxy_bin" "$install_dir/$socks5_proxy_bin"
+
+  log "  ${B_GRN}Installing$RS systemd service"
+  sudo install -Dm644 "$temp_dir/$vpnd_service" "$units_dir/$vpnd_service"
+
+  log "  ${B_GRN}Installed$RS files"
+  log "   ${I_YLW}$(tilded "$install_dir/$vpnd_bin")$RS"
+  log "   ${I_YLW}$(tilded "$install_dir/$socks5_proxy_bin")$RS"
+  log "   ${I_YLW}$(tilded "$units_dir/$vpnd_service")$RS"
+}
+
+install_vpnd_deb() {
+  log "  ${B_GRN}Installing$RS $vpnd_deb"
+  _pushd "$temp_dir"
+  sudo apt install -y "./$vpnd_deb"
+  _popd
+}
+
+# try to remove a bunch of files or directories
+# $1 the array of files
+remove_file_set() {
+  local -n _files=$1
+  declare -a file_set
+  local sudo_needed=false
+
+  # filter out files that don't exist
+  for file in "${_files[@]}"; do
+    if [ -a "$file" ]; then
+      file_set+=("$file")
+    fi
+  done
+
+  # check for write permissions
+  for file in "${file_set[@]}"; do
+    if ! [ -w "$file" ]; then
+      sudo_needed=true
+      break
+    fi
+  done
+
+  if [ "${#file_set[@]}" == 0 ]; then
+    log "    ${ITL}No files found to remove$RS"
+    return 0
+  fi
+
+  log "  Files to remove:"
+  for file in "${file_set[@]}"; do
+    log "    $I_YLW${file/#$HOME/\~}$RS"
+  done
+
+  choice=""
+  log "  Proceed?"
+  prompt="    ${BI_YLW}Y${RS}es ${BI_YLW}N${RS}o "
+  user_prompt choice "$prompt"
+
+  if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+    if [ "$sudo_needed" = true ]; then
+      log "  ${B_YLW}sudo$RS needed to remove some files"
+    fi
+    for file in "${file_set[@]}"; do
+      rmfile "$file"
+    done
+  fi
+}
+
+stop_vpnd_service() {
+  log "  ${B_GRN}Stopping$RS nym-vpnd service"
+  log "  ${B_YLW}sudo$RS needed to stop and disable the service"
+  if sudo systemctl stop nym-vpnd.service &>/dev/null; then
+    log "   ${B_GRN}✓$RS service stopped"
+  else
+    log "   ${B_GRY}✓$RS ${ITL}service is not active$RS"
+  fi
+  if sudo systemctl disable nym-vpnd.service &>/dev/null; then
+    log "   ${B_GRN}✓$RS service disabled$RS"
+  else
+    log "   ${B_GRY}✓$RS ${ITL}service is not enabled$RS"
+  fi
+}
+
+post_install() {
+  if ! dir_in_path "$install_dir"; then
+    log "${B_YLW}⚠$RS $install_dir is not in the ${BLD}PATH$RS
+  please add it using your shell configuration"
+  fi
+}
+
+cleanup() {
+  rm -rf "$temp_dir"
+}
+
+_install() {
+  log "  app ${BI_YLW}$app_version$RS ${I_GRY}client$RS"
+  log "  nym-vpnd ${BI_YLW}$vpnd_version$RS ${I_GRY}daemon$RS\n"
+
+  need_cmd mktemp
+  temp_dir=$(mktemp -d)
+  select_components
+
+  if [ "$install_type" = raw ]; then
+    check_system_pkg
+    sanity_check
+    check_system_deps
+    [[ "$_app" == 0 ]] && download_app_appimage
+    [[ "$_vpnd" == 0 ]] && download_vpnd_raw
+    [[ "$_app" == 0 ]] && install_app_appimage
+    if [ "$_vpnd" == 0 ]; then
+      install_vpnd_raw
+      start_service
+    fi
+    post_install
+  else
+    # can't install app package only
+    if [ "$_app" = 0 ] && [ "$_vpnd" = 1 ]; then
+      log "${B_YLW}⚠$RS can't install app package only (vpnd is required)"
+      exit 1
+    fi
+    [[ "$_vpnd" == 0 ]] && download_vpnd_deb
+    [[ "$_app" == 0 ]] && download_app_deb
+    # as nym-vpnd is a dependency for the app, install it first
+    [[ "$_vpnd" == 0 ]] && install_vpnd_deb
+    [[ "$_app" == 0 ]] && install_app_deb
+  fi
+
+  cleanup
+  log "\n${BI_MGT}DONE$RS"
+}
+
+_uninstall_raw() {
+  check_system_pkg
+
+  local files=()
+  if [ "$_vpnd" == 0 ]; then
+    files+=(
+      "$xdg_bin_home/nym-vpnd"
+      "/usr/bin/nym-vpnd"
+      "/usr/bin/nym-socks5-proxy"
+      "/usr/lib/systemd/system/nym-vpnd.service"
+      "/etc/nym/nym-vpnd.toml"
+    )
+  fi
+  if [ "$_app" == 0 ]; then
+    files+=(
+      "/usr/bin/NymVPN.AppImage"
+      "$desktop_dir/nym-vpn.desktop"
+      "$icons_dir/nym-vpn.svg"
+    )
+  fi
+
+  log "  ${B_GRN}Removing$RS installed files"
+  remove_file_set 'files'
+
+  if [ "$_app" == 0 ]; then
+    log "  ${B_GRN}Remove$RS app config and cache files?"
+
+    choice=""
+    prompt="    ${BI_YLW}Y${RS}es ${BI_YLW}N${RS}o "
+    user_prompt choice "$prompt"
+
+    if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+      local app_dirs=(
+        "$config_home/$app_dir"
+        "$data_home/$app_dir"
+        "$state_home/$app_dir"
+        "$cache_home/$app_dir"
+        "$config_home/$app_id"
+        "$data_home/$app_id"
+        "$state_home/$app_id"
+        "$cache_home/$app_id"
+      )
+      remove_file_set 'app_dirs'
+    fi
+  fi
+
+  if [ "$_vpnd" == 0 ]; then
+    stop_vpnd_service
+  fi
+}
+
+_uninstall_deb() {
+  # packages to remove
+  u_app=1
+  u_vpnd=1
+  _app_ls=$(dpkg -l | grep nym-vpn-app || true)
+  _vpnd_ls=$(dpkg -l | grep nym-vpnd || true)
+  if [ "$_app" = 0 ] && [[ "$_app_ls" == *"ii"* ]]; then
+    u_app=0
+  fi
+  if [ "$_vpnd" = 0 ] && [[ "$_vpnd_ls" == *"ii"* ]]; then
+    u_vpnd=0
+  fi
+  if [ $u_app = 1 ] && [ $u_vpnd = 1 ]; then
+    log "  ${B_YLW}⚠$RS no installed packages found"
+    return 0
+  fi
+  if [ $u_app = 0 ]; then
+    log "  ${B_GRN}Removing$RS nymp-vpn-app"
+    sudo apt remove -y nym-vpn-app
+  fi
+  if [ $u_vpnd = 0 ]; then
+    log "  ${B_GRN}Removing$RS nymp-vpnd"
+    sudo apt remove -y nym-vpnd
+  fi
+}
+
+need_cmd uname
+need_cmd install
+need_cmd sudo
+need_cmd sed
+need_cmd curl
+need_cmd tar
+need_cmd sha256sum
+need_cmd which
+need_cmd grep
+
+if [ "$1" == uninstall ]; then
+  log "$ITL${BI_GRY}nym$RS${BI_GRN}VPN$RS ${BI}uninstaller$RS\n"
+  select_components uninstall
+  if [ "$install_type" = raw ]; then
+    _uninstall_raw
+  else
+    _uninstall_deb
+  fi
+  log "\n${BI_MGT}DONE$RS"
+  exit 0
+fi
+
+log "$ITL${BI_GRY}nym$RS${BI_GRN}VPN$RS ${BI}installer$RS\n"
+[[ "$BUILD_CHANNEL" = "dev" ]] && dev_setup
+_install

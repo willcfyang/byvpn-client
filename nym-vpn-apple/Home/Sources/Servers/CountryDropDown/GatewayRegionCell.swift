@@ -1,0 +1,170 @@
+import SwiftUI
+import ConnectionManager
+import ConnectionTypes
+import GatewayManager
+import ImpactGenerator
+import Theme
+import UIComponents
+
+public struct GatewayRegionCell: View {
+    private let hopType: HopType
+    private let country: ByVpnCountry
+    private let region: String
+    private let servers: [GatewayNode]
+    @EnvironmentObject private var gatewayManager: GatewayManager
+    @Binding private var entryGateway: EntryGateway
+    @Binding private var exitRouter: ExitRouter
+    @Binding private var path: NavigationPath
+    @Binding private var scrollToModel: GatewayScrollToModel
+    @State private var isExpanded: Bool
+    @State private var isButtonHovered = false
+    @State private var isRegionSelected = false
+    private var infoButtonTapCompletion: (@Sendable @MainActor (GatewayNode) -> Void)?
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            regionRow()
+            if isExpanded {
+                ForEach(servers, id: \.id) { server in
+                    Divider()
+                        .frame(height: 1)
+                        .overlay(Color.ByVpn.divider)
+                    GatewayCell(
+                        server: server,
+                        type: hopType,
+                        path: $path,
+                        scrollToModel: $scrollToModel,
+                        infoButtonTapCompletion: { server in
+                            infoButtonTapCompletion?(server)
+                        }
+                    )
+                    .id(GatewayScrollToModel.server(id: server.id).scrollToIdentifier)
+                }
+            }
+        }
+    }
+
+    public init(
+        hopType: HopType,
+        country: ByVpnCountry,
+        region: String,
+        servers: [GatewayNode],
+        infoButtonTapCompletion: (@Sendable @MainActor (GatewayNode) -> Void)?,
+        path: Binding<NavigationPath>,
+        entryGateway: Binding<EntryGateway>,
+        exitRouter: Binding<ExitRouter>,
+        scrollToModel: Binding<GatewayScrollToModel>
+    ) {
+        self.hopType = hopType
+        self.country = country
+        self.region = region
+        self.servers = servers
+        self.infoButtonTapCompletion = infoButtonTapCompletion
+        _path = path
+        _entryGateway = entryGateway
+        _exitRouter = exitRouter
+        _scrollToModel = scrollToModel
+
+        let unwrappedScrollToModel = scrollToModel.wrappedValue
+        let selectedServer = servers.first { $0.id == unwrappedScrollToModel.serverId }
+        let shouldExpand = unwrappedScrollToModel.shouldExpand(
+            countryCode: country.code,
+            region: region,
+            server: selectedServer
+        )
+        _isExpanded = State(initialValue: shouldExpand)
+        let shouldSelect = unwrappedScrollToModel.region == region && unwrappedScrollToModel.isRegion
+        _isRegionSelected = State(initialValue: shouldSelect)
+    }
+}
+
+private extension GatewayRegionCell {
+    @ViewBuilder
+    func regionRow() -> some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Text(region)
+                    .foregroundStyle(Color.ByVpn.textPrimary)
+                    .byVpnTextStyle(.bodyLarge)
+                    .padding(.leading, ByVpnSpacing.large)
+                Spacer()
+            }
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(region) \(servers.count) \("servers".localizedString)")
+            .accessibilityValue(isRegionSelected ? "selected".localizedString : "")
+            .accessibilityAddTraits([.isButton])
+            .onTapGesture {
+                regionSelectTapAction()
+            }
+            .accessibilityAction {
+                regionSelectTapAction()
+            }
+
+            chevron()
+                .padding(.trailing, ByVpnSpacing.large)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("gatewaySelector.expandServers".localizedString)
+                .accessibilityAddTraits([.isButton])
+                .onTapGesture {
+                    expandTapAction()
+                }
+                .accessibilityAction {
+                    expandTapAction()
+                }
+        }
+        .frame(height: 56)
+        .padding(.leading, ByVpnSpacing.medium)
+        .background(isButtonHovered ? Color.ByVpn.background.opacity(0.3) : Color.clear)
+        .overlay {
+            Rectangle()
+                .inset(by: 0.5)
+                .stroke(isRegionSelected ? Color.ByVpn.primary : .clear, lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+        .animation(.default, value: isRegionSelected)
+        .onHover { newValue in
+            isButtonHovered = newValue
+        }
+    }
+
+    func chevron() -> some View {
+        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(isExpanded ? Color.ByVpn.primary : Color.ByVpn.textSecondary)
+            .frame(width: 24, height: 24)
+            .animation(.easeInOut(duration: 0.2), value: isExpanded)
+    }
+}
+
+public extension GatewayRegionCell {
+    func updateIsRegionSelected() {
+        switch scrollToModel {
+        case let .region(countryCode: _, region: countryRegion):
+            isRegionSelected = countryRegion == region
+        default:
+            isRegionSelected = false
+        }
+    }
+
+    func expandTapAction() {
+        ImpactGenerator.shared.softImpact()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isExpanded.toggle()
+        }
+    }
+
+    func regionSelectTapAction() {
+        ImpactGenerator.shared.softImpact()
+        switch hopType {
+        case .entry:
+            entryGateway = .region(countryCode: country.code, region: region)
+        case .exit:
+            exitRouter = .region(countryCode: country.code, region: region)
+        }
+        path = .init()
+    }
+}

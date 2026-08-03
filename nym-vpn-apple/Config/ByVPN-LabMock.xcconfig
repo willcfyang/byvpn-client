@@ -1,0 +1,3 @@
+// Internal lab builds only — do not Archive for App Store with this config.
+LAB_MOCK_ENABLED = YES
+// Pair with Info.plist LabMock=true / BYVPN_APP_LAB_MOCK=1 for local lab.

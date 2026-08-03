@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+	<style name="Theme.NymVPN" parent="Theme.AppCompat.NoActionBar">
+		<item name="android:fontFamily">@font/lab_grotesque_regular</item>
+	</style>
+
+	<style name="Theme.NymVPN.Starting" parent="Theme.SplashScreen">
+		<item name="windowSplashScreenBackground">@color/splash_background</item>
+		<item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+		<item name="postSplashScreenTheme">@style/Theme.NymVPN</item>
+		<item name="android:navigationBarColor">@color/splash_background</item>
+	</style>
+
+	<style name="Theme.NymVPN.Transparent" parent="Theme.Material3.DayNight.NoActionBar">
+		<item name="android:windowIsTranslucent">true</item>
+		<item name="android:windowBackground">@android:color/transparent</item>
+		<item name="android:windowNoTitle">true</item>
+		<item name="android:backgroundDimEnabled">false</item>
+	</style>
+</resources>

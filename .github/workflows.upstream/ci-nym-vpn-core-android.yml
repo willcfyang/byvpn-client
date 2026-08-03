@@ -1,0 +1,94 @@
+name: ci-nym-vpn-core-android
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "nym-vpn-core/crates/**"
+      - "nym-vpn-core/Cargo.toml"
+      - "nym-vpn-core/Cargo.lock"
+      - "nym-vpn-core/Android.mk"
+      - ".github/workflows/ci-nym-vpn-core-android.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  AGENT_ISSELFHOSTED: 1 # https://github.com/actions/setup-go/issues/432
+  RUSTC_WRAPPER: sccache
+  SCCACHE_REDIS_ENDPOINT: ${{ secrets.SCCACHE_REDIS_ENDPOINT }}
+  SCCACHE_REDIS_PASSWORD: ${{ secrets.SCCACHE_REDIS_PASSWORD }}
+  SCCACHE_REDIS_EXPIRATION: 86400
+
+jobs:
+  build-wireguard-go-android:
+    uses: ./.github/workflows/build-wireguard-go-android.yml
+
+  build:
+    runs-on: arc-linux-latest
+    needs: build-wireguard-go-android
+
+    steps:
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev libmnl-dev libnftnl-dev protobuf-compiler git curl gcc g++ make unzip rsync
+
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Dotenv Action
+        uses: xom9ikk/dotenv@v2.4.0
+
+      - uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - name: Install cargo-ndk
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-ndk
+
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: false
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
+          echo "NDK_TOOLCHAIN_DIR=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "21.12" # 3.21.12: the version on ubuntu 24.04. Don't change this!
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: wireguard-go_aarch64-linux-android
+          path: build/lib/aarch64-linux-android
+
+      - name: rustfmt check
+        working-directory: nym-vpn-core
+        run: |
+          cargo fmt --check --all
+
+      - name: Clippy
+        working-directory: nym-vpn-core
+        run: |
+          cargo ndk -t aarch64-linux-android clippy -p nym-vpn-lib-uniffi -- -Dwarning
+
+      - name: Build
+        working-directory: nym-vpn-core
+        run: |
+          make -f Android.mk build RELEASE=false

@@ -1,0 +1,6 @@
+[submodule "nym-vpn-windows/windows-libraries"]
+	path = nym-vpn-windows/windows-libraries
+	url = https://github.com/mullvad/windows-libraries.git
+[submodule "nym-vpn-windows/libwfp"]
+	path = nym-vpn-windows/libwfp
+	url = https://github.com/mullvad/libwfp

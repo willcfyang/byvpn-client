@@ -1,0 +1,59 @@
+name: ci-nym-vpn-app-js
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/ci-nym-vpn-app-js.yml"
+      - "nym-vpn-app/**"
+  workflow_dispatch:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [arc-linux-latest, custom-windows-11]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.env
+            /nym-vpn-app/
+
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: nym-vpn-app/package-lock.json
+          package-manager-cache: false
+
+      - name: Install dependencies
+        working-directory: nym-vpn-app
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: nym-vpn-app
+        run: npm run tscheck
+
+      - name: Check lint
+        working-directory: nym-vpn-app
+        run: npm run lint
+
+      - name: Check formatting
+        working-directory: nym-vpn-app
+        run: npm run fmt:check
+
+      #      - name: Run tests
+      #        working-directory: nym-vpn-app
+      #        run: npm run test
+
+      - name: Check build
+        working-directory: nym-vpn-app
+        run: npm run build

@@ -1,0 +1,307 @@
+import SwiftUI
+import AppSettings
+import Constants
+import SnackbarManager
+import Theme
+import UIComponents
+
+public struct SantasView: View {
+    @EnvironmentObject private var appSettings: AppSettings
+    @ObservedObject private var viewModel: SantasViewModel
+
+    public init(viewModel: SantasViewModel) {
+        self.viewModel = viewModel
+    }
+
+    public var body: some View {
+        VStack(spacing: .zero) {
+            navbar()
+            ScrollView {
+                santasSpacer()
+                VStack {
+                    enivironmentDetails()
+                    santasSpacer()
+                    environmentSection()
+                    santasSpacer()
+                    togglesSection()
+                    santasSpacer()
+                    snackbarSection()
+                    santasSpacer()
+                    logsSection()
+                }
+                Spacer()
+            }
+            .scrollIndicators(.never)
+        }
+        .preferredColorScheme(AppSettings.shared.currentAppearance.colorScheme)
+        .navigationBarBackButtonHidden(true)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            Color.ByVpn.background
+                .ignoresSafeArea()
+        }
+    }
+}
+
+private extension SantasView {
+    func navbar() -> some View {
+        CustomNavBar(
+            title: viewModel.title,
+            leftButton: CustomNavBarButton(type: .back, action: { viewModel.navigateBack() })
+        )
+        .padding(0)
+    }
+
+    func enivironmentDetails() -> some View {
+        VStack {
+            Text("Environment Details:")
+                .foregroundStyle(Color.ByVpn.primary)
+                .bold()
+                .padding(4)
+            Text("App environment: \(viewModel.currentAppEnv)")
+                .padding(4)
+            Text("Daemon/lib environment: \(viewModel.actualEnv)")
+                .padding(4)
+            Text("Daemon/lib version: \(viewModel.libVersion)")
+                .padding(4)
+#if os(macOS)
+            Button("Refetch daemon info") {
+                viewModel.updateDaemonInfo()
+            }
+#endif
+        }
+        .padding(16)
+    }
+
+    func environmentSection() -> some View {
+        VStack {
+            Text("Environment:")
+                .foregroundStyle(Color.ByVpn.primary)
+                .bold()
+                .padding(4)
+#if os(macOS)
+            Text("⚠️ Please restart daemon after switching the env ⚠️")
+                .padding(4)
+#endif
+            HStack {
+                ForEach(viewModel.envs, id: \.self) { env in
+                    Button(env.rawValue) {
+                        viewModel.changeEnvironment(to: env)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    func togglesSection() -> some View {
+        VStack {
+            Toggle(isOn: $appSettings.isMixnetTuningEnabled) {
+                Text("Mixnet tuning")
+            }
+            .tint(Color.ByVpn.primary)
+        }.padding()
+    }
+
+    func snackbarSection() -> some View {
+        VStack(spacing: 8) {
+            Text("Snackbar tests:")
+                .foregroundStyle(Color.ByVpn.primary)
+                .bold()
+                .padding(4)
+            Text("Tap, then pop back to Home to see them play.")
+                .font(.caption)
+                .padding(4)
+
+            Text("Style coverage")
+                .foregroundStyle(Color.ByVpn.primary)
+                .padding(.top, 4)
+            Button("Queue all 5 styles") {
+                SantasView.styleFixtures.forEach { SnackbarManager.shared.enqueue($0.item) }
+            }
+            ForEach(SantasView.styleFixtures, id: \.label) { fixture in
+                Button(fixture.label) {
+                    SnackbarManager.shared.enqueue(fixture.item)
+                }
+            }
+
+            Text("Real scenarios")
+                .foregroundStyle(Color.ByVpn.primary)
+                .padding(.top, 8)
+            Button("Queue all real scenarios") {
+                SantasView.realFixtures.forEach { SnackbarManager.shared.enqueue($0.item) }
+            }
+            ForEach(SantasView.realFixtures, id: \.label) { fixture in
+                Button(fixture.label) {
+                    SnackbarManager.shared.enqueue(fixture.item)
+                }
+            }
+
+            Button("Clear queue") {
+                SnackbarManager.shared.clear()
+            }
+            .padding(.top, 8)
+        }
+        .padding(16)
+    }
+
+    func logsSection() -> some View {
+        VStack {
+            Text("Logs:")
+                .foregroundStyle(Color.ByVpn.primary)
+                .bold()
+                .padding(4)
+            Text("Logs size: \(viewModel.logFilesSize)")
+                .padding(4)
+        }
+        .padding(16)
+    }
+}
+
+private extension SantasView {
+    func santasSpacer() -> some View {
+        Spacer()
+            .frame(height: 16)
+    }
+}
+
+private extension SantasView {
+    struct SnackbarFixture {
+        let label: String
+        let item: SnackbarItem
+    }
+
+    static let styleFixtures: [SnackbarFixture] = [
+        SnackbarFixture(
+            label: "Critical (action)",
+            item: SnackbarItem(
+                style: .critical,
+                title: "Error connecting",
+                message: "The selected gateway is not available!",
+                actionTitle: "Try again",
+                onAction: {}
+            )
+        ),
+        SnackbarFixture(
+            label: "Confirmation",
+            item: SnackbarItem(
+                style: .confirmation,
+                title: "Renewal success!",
+                message: "Welcome back to actual privacy."
+            )
+        ),
+        SnackbarFixture(
+            label: "Neutral (action)",
+            item: SnackbarItem(
+                style: .neutral,
+                title: "Heads up",
+                message: "Regular info",
+                actionTitle: "Action",
+                onAction: {}
+            )
+        ),
+        SnackbarFixture(
+            label: "Negative (action)",
+            item: SnackbarItem(
+                style: .negative,
+                title: "Negative alert",
+                message: "Explain negative situation",
+                actionTitle: "Action",
+                onAction: {}
+            )
+        ),
+        SnackbarFixture(
+            label: "Warning",
+            item: SnackbarItem(
+                style: .warning,
+                title: "Subscription expired"
+            )
+        )
+    ]
+
+    static var realFixtures: [SnackbarFixture] {
+        [
+            SnackbarFixture(
+                label: "OneClick: offline",
+                item: SnackbarItem(
+                    style: .warning,
+                    title: "home.modal.noInternetConnection.title".localizedString,
+                    message: "home.modal.noInternetConnection.subtitle".localizedString
+                )
+            ),
+            SnackbarFixture(
+                label: "OneClick: connection failed (retry)",
+                item: SnackbarItem(
+                    style: .critical,
+                    title: "connectionError.title".localizedString,
+                    message: connectionErrorBody(
+                        reason: "Mock failure: gateway timed out."
+                    ),
+                    actionTitle: "disconnect".localizedString,
+                    onAction: {},
+                    duration: 7
+                )
+            ),
+            SnackbarFixture(
+                label: "Auth: login failed",
+                item: SnackbarItem(
+                    style: .critical,
+                    title: "error".localizedString,
+                    message: "Invalid recovery phrase."
+                )
+            ),
+            SnackbarFixture(
+                label: "Proxy: enabled",
+                item: SnackbarItem(
+                    style: .confirmation,
+                    title: "proxy.snackbar.successfullyEnabled".localizedString
+                )
+            ),
+            SnackbarFixture(
+                label: "Proxy: connection failed",
+                item: SnackbarItem(
+                    style: .negative,
+                    title: "proxy.snackbar.connectionFailed".localizedString
+                )
+            ),
+            SnackbarFixture(
+                label: "DNS: saved",
+                item: SnackbarItem(
+                    style: .confirmation,
+                    title: "dns.snackbar.saved".localizedString
+                )
+            ),
+            SnackbarFixture(
+                label: "Generic: something went wrong",
+                item: SnackbarItem(
+                    style: .negative,
+                    title: "generalByVpnError.somethingWentWrong".localizedString
+                )
+            ),
+            SnackbarFixture(
+                label: "Mixnet tuning: saved",
+                item: SnackbarItem(
+                    style: .confirmation,
+                    title: "mixnetTuning.snackbar.saved".localizedString
+                )
+            ),
+            SnackbarFixture(
+                label: "Copied to pasteboard",
+                item: SnackbarItem(
+                    style: .confirmation,
+                    title: "settings.copiedToPasteboard".localizedString
+                )
+            )
+        ]
+    }
+
+    /// Mirrors `Home/Sources/26/ConnectionStatus/ConnectionErrorCopy.message(reason:)`.
+    /// Inlined because ConnectionErrorCopy is internal to the Home module.
+    static func connectionErrorBody(reason: String?) -> String {
+        let hint = "connectionError.killswitchHint".localizedString
+        let instruction = "connectionError.disconnectInstruction".localizedString
+        let tail = hint + "\n\n" + instruction
+        guard let reason, !reason.isEmpty else { return tail }
+        return reason + "\n\n" + tail
+    }
+}

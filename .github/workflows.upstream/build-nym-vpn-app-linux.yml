@@ -1,0 +1,183 @@
+name: build-nym-vpn-app-linux
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/build-nym-vpn-app-linux.yml"
+  workflow_dispatch:
+    inputs:
+      dev_mode:
+        description: "dev build"
+        required: true
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      # set to true when it is a 'dev' build
+      dev_mode:
+        required: true
+        type: boolean
+        default: false
+    secrets:
+      TAURI_PRIVATE_KEY:
+        required: true
+      TAURI_KEY_PASSWORD:
+        required: true
+      DESKTOP_JS_SENTRY_DSN:
+        required: true
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    strategy:
+      matrix:
+        include:
+          - os: "ubuntu-22.04"
+            arch: "x86_64"
+            deb_arch: "amd64"
+            app_image_arch: "amd64"
+            bin_arch: "x64"
+          - os: "ubuntu-22.04-arm"
+            arch: "aarch64"
+            deb_arch: "arm64"
+            app_image_arch: "aarch64"
+            bin_arch: "arm64"
+    runs-on: ${{ matrix.os }}
+    env:
+      UPDATER_BUNDLE_NAME: updater_linux_${{ matrix.arch }}.AppImage.tar.gz
+      UPLOAD_DIR_LINUX: linux_artifacts_${{ matrix.arch }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Dotenv Action
+        uses: xom9ikk/dotenv@v2.4.0
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y libdbus-1-dev libmnl-dev libnftnl-dev \
+            libwebkit2gtk-4.1-dev build-essential curl wget libxdo-dev libssl-dev jq \
+            libgtk-3-dev squashfs-tools libayatana-appindicator3-dev make unzip librsvg2-dev file \
+            libsoup-3.0-dev libjavascriptcoregtk-4.1-dev desktop-file-utils xdg-utils
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+
+      - name: Install cargo-license
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-license
+
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "21.12" # version on ubuntu 24.04
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get package version
+        id: package-version
+        uses: nicolaiunrein/cargo-get@master
+        with:
+          subcommand: package.version --entry nym-vpn-app/src-tauri
+
+      - name: Get rust version used for build
+        id: rust-version
+        run: |
+          echo "rustc=$(rustc -V)" >> $GITHUB_OUTPUT
+
+      - name: Install JS dependencies
+        working-directory: nym-vpn-app
+        shell: bash
+        run: npm ci
+
+      - name: Generate licenses file (Js)
+        working-directory: nym-vpn-app
+        shell: bash
+        run: |
+          rm public/licenses-js.json || true
+          npm run gen:licenses:js
+
+      - name: Generate licenses file (Rust)
+        working-directory: nym-vpn-app
+        shell: bash
+        run: |
+          rm public/licenses-rust.json || true
+          npm run gen:licenses:rust
+
+      - name: Install Crowdin CLI
+        run: |
+          npm install -g @crowdin/cli
+
+      - name: Verify Crowdin install
+        run: |
+          crowdin --version
+
+      - name: Download translations from Crowdin (Linux)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
+          CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
+        run: |
+          crowdin download translations \
+            --config crowdin-configs/linux-windows.yml \
+
+      - name: Build tauri app
+        working-directory: nym-vpn-app/src-tauri
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          APP_SENTRY_DSN: ${{ secrets.DESKTOP_JS_SENTRY_DSN }}
+          DEV_MODE: ${{ inputs.dev_mode == true }}
+          UPDATER_ENABLED: false
+        run: |
+          npm run tauri build -- --bundles deb,appimage
+          ls -la target/release/ || true
+          ls -la target/release/bundle/* || true
+
+      - name: Repack deb package
+        id: repack-deb
+        env:
+          SRC_DEB: nym-vpn-app/src-tauri/target/release/bundle/deb/NymVPN_${{ steps.package-version.outputs.metadata }}_${{ matrix.deb_arch }}.deb
+          PKGVER: ${{ steps.package-version.outputs.metadata }}
+        run: |
+          ./.pkg/repack_deb.sh
+
+      - name: Move things around to prepare for upload
+        env:
+          SRC_APPIMAGE: nym-vpn-app/src-tauri/target/release/bundle/appimage/NymVPN_${{ steps.package-version.outputs.metadata }}_${{ matrix.app_image_arch }}.AppImage
+          DST_APPIMAGE: NymVPN_${{ steps.package-version.outputs.metadata }}_${{ matrix.app_image_arch }}.AppImage
+          SRC_DEB: ${{ steps.repack-deb.outputs.package }}
+          SRC_BIN: nym-vpn-app/src-tauri/target/release/nym-vpn-app
+          DST_BIN: nym-vpn_${{ steps.package-version.outputs.metadata }}_linux_${{ matrix.bin_arch }}
+        run: |
+          mkdir ${{ env.UPLOAD_DIR_LINUX }}
+          echo "Copy AppImage"
+          cp -vpr ${{ env.SRC_APPIMAGE }} ${{ env.UPLOAD_DIR_LINUX }}/${{ env.DST_APPIMAGE }}
+          #echo "Copy updater bundle and signature"
+          #cp -vpr ${{ env.SRC_APPIMAGE }}.tar.gz     ${{ env.UPLOAD_DIR_LINUX }}/${{ env.UPDATER_BUNDLE_NAME }}
+          #cp -vpr ${{ env.SRC_APPIMAGE }}.tar.gz.sig ${{ env.UPLOAD_DIR_LINUX }}/${{ env.UPDATER_BUNDLE_NAME }}.sig
+          echo "Copy debian pkg"
+          cp -vpr ${{ env.SRC_DEB }} ${{ env.UPLOAD_DIR_LINUX }}
+          echo "Copy plain binary"
+          cp -vpr ${{ env.SRC_BIN }} ${{ env.UPLOAD_DIR_LINUX }}/${{ env.DST_BIN }}
+          echo "Copy install script"
+          cp -vpr .pkg/linux/install ${{ env.UPLOAD_DIR_LINUX }}/install
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.UPLOAD_DIR_LINUX }}
+          path: ${{ env.UPLOAD_DIR_LINUX }}
+          if-no-files-found: error
+          retention-days: 1

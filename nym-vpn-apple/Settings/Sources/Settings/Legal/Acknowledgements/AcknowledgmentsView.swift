@@ -1,0 +1,62 @@
+import SwiftUI
+import Device
+import Theme
+import UIComponents
+
+struct AcknowledgmentsView: View {
+        @ObservedObject private var viewModel: AcknowledgeMentsViewModel
+
+        init(viewModel: AcknowledgeMentsViewModel) {
+            self.viewModel = viewModel
+        }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            navbar()
+            VStack(spacing: 0) {
+                section()
+                    .frame(maxWidth: MagicNumbers.maxWidth)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+        }
+        .navigationBarBackButtonHidden(true)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(edges: [.bottom])
+        .background {
+            Color.ByVpn.background
+                .ignoresSafeArea()
+        }
+    }
+}
+
+private extension AcknowledgmentsView {
+    @ViewBuilder
+    func navbar() -> some View {
+        CustomNavBar(
+            title: viewModel.title,
+            leftButton: CustomNavBarButton(type: .back, action: { viewModel.navigateBack() })
+        )
+    }
+
+    @ViewBuilder
+    func section() -> some View {
+        ScrollView {
+            Spacer()
+                .frame(height: 8)
+
+            ForEach(viewModel.acknowledgements) { acknowledgement in
+                AcknowledgementsRow(
+                    viewModel: AcknowledgementsRowViewModel(
+                        acknowledgement: acknowledgement,
+                        navigationPath: viewModel.$navigationPath,
+                        externalLinkManager: .shared
+                    )
+                )
+            }
+            Spacer()
+                .frame(height: 24)
+        }
+        .scrollIndicators(.never)
+    }
+}

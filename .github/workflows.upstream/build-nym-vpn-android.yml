@@ -1,0 +1,285 @@
+name: build-nym-vpn-android
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/build-nym-vpn-android.yml"
+  workflow_dispatch:
+    inputs:
+      build_type:
+        type: choice
+        description: "Build type"
+        required: true
+        default: debug
+        options:
+          - debug
+          - prerelease
+          - nightly
+          - release
+      build_format:
+        type: choice
+        description: "Build format"
+        required: true
+        default: apk
+        options:
+          - bundle
+          - apk
+      skip_crowdin:
+        type: boolean
+        description: "Skip Crowdin translations download"
+        required: false
+        default: false
+  workflow_call:
+    inputs:
+      build_type:
+        type: string
+        description: "Build type"
+        required: true
+        default: debug
+      build_format:
+        type: string
+        description: "Build format"
+        required: true
+        default: apk
+      skip_crowdin:
+        type: boolean
+        description: "Skip Crowdin translations download"
+        required: false
+        default: false
+    secrets:
+      SCCACHE_REDIS_ENDPOINT:
+        required: false
+      SCCACHE_REDIS_PASSWORD:
+        required: false
+      ANDROID_SIGNING_KEY_ALIAS:
+        required: false
+      ANDROID_SIGNING_KEY_PASSWORD:
+        required: false
+      ANDROID_SIGNING_STORE_PASSWORD:
+        required: false
+      ANDROID_SENTRY_DSN:
+        required: false
+      ANDROID_SERVICE_ACCOUNT_JSON:
+        required: false
+      ANDROID_KEYSTORE:
+        required: false
+      CROWDIN_PROJECT_ID:
+        required: false
+      CROWDIN_PERSONAL_TOKEN:
+        required: false
+env:
+  UPLOAD_DIR_ANDROID: android_artifacts
+
+jobs:
+  build:
+    runs-on: arc-linux-latest
+    timeout-minutes: 90
+    env:
+      SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+      SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+      SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+      SENTRY_DSN: ${{ secrets.ANDROID_SENTRY_DSN }}
+      KEY_STORE_FILE: "android_keystore.jks"
+      KEY_STORE_LOCATION: ${{ github.workspace }}/nym-vpn-android/app/keystore/
+    defaults:
+      run:
+        working-directory: nym-vpn-android
+    outputs:
+      UPLOAD_DIR_ANDROID: ${{ env.UPLOAD_DIR_ANDROID }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Dotenv Action
+        uses: xom9ikk/dotenv@v2.4.0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Cache NDK
+        uses: actions/cache@v5
+        id: cache-ndk
+        with:
+          path: /usr/local/lib/android/sdk/ndk/${{ env.NDK_VERSION }}
+          key: ndk-${{ env.NDK_VERSION }}
+          restore-keys: |
+            ndk-
+
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        timeout-minutes: 10
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: false
+
+      - name: Verify NDK Setup
+        run: |
+          echo "NDK Path: ${{ steps.setup-ndk.outputs.ndk-path }}"
+          if [ ! -d "${{ steps.setup-ndk.outputs.ndk-path }}" ]; then
+            echo "Error: NDK directory not found at ${{ steps.setup-ndk.outputs.ndk-path }}"
+            exit 1
+          fi
+          echo "NDK setup successful"
+          ls -la "${{ steps.setup-ndk.outputs.ndk-path }}"
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
+          echo "NDK_TOOLCHAIN_DIR=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          cache-dependency-path: wireguard/libwg/go.sum
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - name: Run sccache-cache only for non-release runs
+        if: ${{ inputs.build_type == 'debug' }}
+        uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Set Rust caching env vars only for non-release runs
+        if: ${{ inputs.build_type == 'debug' }}
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_REDIS_ENDPOINT=${{ secrets.SCCACHE_REDIS_ENDPOINT }}" >> $GITHUB_ENV
+          echo "SCCACHE_REDIS_PASSWORD=${{ secrets.SCCACHE_REDIS_PASSWORD }}" >> $GITHUB_ENV
+          echo "SCCACHE_REDIS_EXPIRATION=86400" >> $GITHUB_ENV
+
+      - name: Install cargo-ndk
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-ndk
+
+      - name: Install cargo-license
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-license
+
+      - name: Install deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y libdbus-1-dev libmnl-dev libnftnl-dev protobuf-compiler git curl gcc g++ make unzip rsync
+
+      - name: Decode Keystore
+        if: ${{ inputs.build_type != 'debug' }}
+        id: decode_keystore
+        uses: timheuer/base64-to-file@v1.2
+        with:
+          fileName: ${{ env.KEY_STORE_FILE }}
+          fileDir: ${{ env.KEY_STORE_LOCATION }}
+          encodedString: ${{ secrets.ANDROID_KEYSTORE }}
+
+      - name: Create keystore path env var
+        if: ${{ inputs.build_type != 'debug' }}
+        run: |
+          store_path=${{ env.KEY_STORE_LOCATION }}${{ env.KEY_STORE_FILE }}
+          echo "KEY_STORE_PATH=$store_path" >> $GITHUB_ENV
+
+      - name: Create service_account.json
+        if: ${{ inputs.build_type != 'debug' }}
+        id: createServiceAccount
+        run: echo '${{ secrets.ANDROID_SERVICE_ACCOUNT_JSON }}' > service_account.json
+
+      - name: Build Fdroid Release Apk
+        if: ${{ inputs.build_type == 'release' && inputs.build_format == 'apk' }}
+        timeout-minutes: 45
+        run: ./gradlew :app:assembleFdroidRelease --info
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+
+      - name: Build Fdroid Release Bundle
+        if: ${{ inputs.build_type == 'release' && inputs.build_format == 'aab' }}
+        timeout-minutes: 45
+        run: ./gradlew :app:bundleFdroidRelease --info
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+
+      - name: Build Fdroid Prerelease Apk
+        if: ${{ inputs.build_type == 'prerelease' && inputs.build_format == 'apk' }}
+        timeout-minutes: 45
+        run: ./gradlew :app:assembleFdroidPrerelease --info
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+
+      - name: Build Fdroid Prerelease Bundle
+        if: ${{ inputs.build_type == 'prerelease' && inputs.build_format == 'aab' }}
+        timeout-minutes: 45
+        run: ./gradlew :app:bundleFdroidPrerelease --info
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+
+      - name: Build Fdroid Nightly Apk
+        if: ${{ inputs.build_type == 'nightly' && inputs.build_format == 'apk' }}
+        timeout-minutes: 45
+        run: ./gradlew :app:assembleFdroidNightly --info
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+
+      - name: Build Fdroid Nightly Bundle
+        if: ${{ inputs.build_type == 'nightly' && inputs.build_format == 'aab' }}
+        timeout-minutes: 45
+        run: ./gradlew :app:bundleFdroidNightly --info
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+
+      - name: Build Debug Apk
+        if: ${{ inputs.build_type == 'debug' && inputs.build_format == 'apk' }}
+        timeout-minutes: 45
+        run: ./gradlew :app:assembleFdroidDebug --stacktrace
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+
+      - name: Build Debug Bundle
+        if: ${{ inputs.build_type == 'debug' && inputs.build_format == 'aab' }}
+        timeout-minutes: 45
+        run: ./gradlew :app:bundleFdroidDebug --stacktrace
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+
+      - name: Get output path
+        id: output-path
+        run: |
+          if [ "${{ inputs.build_format }}" == "apk" ]; then
+            echo "path=$(find . -regex '^.*/build/outputs/apk/fdroid/${{ inputs.build_type }}/.*\.apk$' -type f | head -1 | tail -c+2)" >> $GITHUB_OUTPUT
+          else
+            BUILD_TYPE=$(echo "${{ inputs.build_type }}" | sed 's/./\u&/')
+            echo "path=$(find . -regex '^.*/build/outputs/bundle/fdroidRelease/.*\.aab$' -type f | head -1 | tail -c+2)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.UPLOAD_DIR_ANDROID }}
+          path: ${{ github.workspace }}/nym-vpn-android${{ steps.output-path.outputs.path }}
+          if-no-files-found: error
+          retention-days: 1

@@ -1,0 +1,50 @@
+# To build the image:
+# docker build --platform linux/amd64 . -t docker.io/nymtech/android-wg-patched -f Dockerfile_AndroidPatchedGoruntime
+# To push the image to docker.io:
+# docker push docker.io/nymtech/android-wg-patched
+
+FROM debian@sha256:77f46c1cf862290e750e913defffb2828c889d291a93bdd10a7a0597720948fc
+
+RUN apt-get update -y && apt-get install -y \
+    curl \
+    file \
+    gcc \
+    git \
+    make \
+    python \
+    unzip
+
+# Install Android NDK
+RUN cd /tmp && \
+    curl -sf -L -o ndk.zip https://dl.google.com/android/repository/android-ndk-r28c-linux.zip && \
+    echo "dfb20d396df28ca02a8c708314b814a4d961dc9074f9a161932746f815aa552f ndk.zip" | sha256sum -c - && \
+    mkdir /opt/android && \
+    cd /opt/android && \
+    unzip -q /tmp/ndk.zip && \
+    rm /tmp/ndk.zip
+
+
+ENV ANDROID_NDK_HOME="/opt/android/android-ndk-r28c"
+ENV NDK_TOOLCHAIN_DIR="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+
+ENV GOLANG_VERSION=1.24.4
+ENV GOLANG_HASH=77e5da33bb72aeaef1ba4418b6fe511bc4d041873cbf82e5aa6318740df98717
+
+# Install Go-lang and patch it to use the appropriate monotonic clock
+COPY goruntime-boottime-over-monotonic.diff /opt/goruntime-boottime-over-monotonic.diff
+RUN cd /tmp && \
+    curl -sf -L -o go.tgz https://go.dev/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz && \
+    echo "${GOLANG_HASH} go.tgz" | sha256sum -c - && \
+    cd /opt && \
+    tar -xzf /tmp/go.tgz && \
+    rm /tmp/go.tgz && \
+    patch -p1 -f -N -r- -d "/opt/go" < /opt/goruntime-boottime-over-monotonic.diff
+
+ENV PATH=${PATH}:/opt/go/bin
+ENV GOROOT=/opt/go
+ENV GOPATH=/opt/go-path
+
+RUN apt-get remove -y curl && \
+    apt-get autoremove -y
+
+ENTRYPOINT []

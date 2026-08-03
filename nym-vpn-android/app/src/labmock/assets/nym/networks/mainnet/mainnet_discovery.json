@@ -1,0 +1,50 @@
+{
+  "updated_at": "2026-07-30 23:55:06.101837062",
+  "value": {
+    "network_name": "mainnet",
+    "nym_api_url": "http://104.250.122.199:8088/api/",
+    "nym_api_urls": [
+      {
+        "url": "http://104.250.122.199:8088/api/",
+        "fronts": null
+      }
+    ],
+    "nym_vpn_api_url": "http://104.250.122.199:8088/api/",
+    "nym_vpn_api_urls": [
+      {
+        "url": "http://104.250.122.199:8088/api/",
+        "fronts": null
+      }
+    ],
+    "account_management": null,
+    "feature_flags": {
+      "domain_fronting": {
+        "enabled": "false"
+      },
+      "privy": {
+        "enabled": "false"
+      },
+      "zkNyms": {
+        "credentialMode": "false"
+      },
+      "quic": {
+        "enabled": "false"
+      }
+    },
+    "system_configuration": {
+      "mix_thresholds": {
+        "high": 75,
+        "medium": 50,
+        "low": 25
+      },
+      "wg_thresholds": {
+        "high": 75,
+        "medium": 50,
+        "low": 25
+      },
+      "statistics_api": null,
+      "min_supported_app_versions": null
+    },
+    "system_messages": []
+  }
+}

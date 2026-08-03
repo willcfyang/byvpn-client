@@ -1,0 +1,71 @@
+name: build-st-driver-windows
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/build-st-driver-windows.yml"
+      - "nym-windows/**"
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+
+# https://github.com/actions/runner-images/issues/1794#issuecomment-707217728
+
+jobs:
+  build:
+    runs-on: "custom-windows-11"
+
+    steps:
+      - name: Cleanup working directory
+        shell: bash
+        run: |
+          ls -la ./
+          rm -rf ./* || true
+          rm -rf ./.??* || true
+          ls -la ./
+
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - name: Setup MSBuild.exe
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57
+
+      - name: Install GNU make
+        run: |
+          winget list GnuWin32.Make || winget install --disable-interactivity --accept-source-agreements --id GnuWin32.Make
+          echo "${env:ProgramFiles(x86)}\GnuWin32\bin" | Out-File -FilePath "$env:GITHUB_PATH" -Append
+
+      - name: Setup VS dev shell
+        uses: humbletim/vsdevenv-shell@503210b7b39a7405e534ea93c36a733b93f01087
+
+      - name: Build st-driver
+        shell: vsdevenv x64 pwsh {0}
+        working-directory: nym-vpn-windows/split-tunnel-driver
+        run: |
+          MSBuild.exe /m nymvpn-split-tunnel\nymvpn-split-tunnel.sln /p:Configuration=Release /p:Platform=x64
+          MSBuild.exe /m nymvpn-split-tunnel\nymvpn-split-tunnel.sln /p:Configuration=Release /p:Platform=ARM64
+
+      - name: Move things around to prepare for upload
+        shell: bash
+        run: |
+          src="nym-vpn-windows/split-tunnel-driver/bin"
+          dst="build/st-driver"
+          for arch in x64-Release ARM64-Release; do
+            mkdir -p "$dst/$arch"
+            for file in nymvpn-split-tunnel.sys nymvpn-split-tunnel.inf nymvpn-split-tunnel.cat; do
+              cp "$src/$arch/nymvpn-split-tunnel/$file" "$dst/$arch/"
+            done
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: st-driver
+          path: ${{ github.workspace }}/build/st-driver/
+          if-no-files-found: error
+          retention-days: 1

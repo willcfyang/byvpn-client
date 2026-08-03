@@ -1,0 +1,288 @@
+name: publish-nym-vpn-core
+on:
+  schedule:
+    - cron: "4 2 * * *"
+  workflow_dispatch:
+    inputs:
+      publish_to_github:
+        description: "If the build should be published to github. Only has an effect when the workspace version is a pre-release, if the version is not a pre-release then it will be automatically published."
+        type: boolean
+        default: false
+        required: true
+  push:
+    tags:
+      - nym-vpn-core-v[0-9]+.[0-9]+.[0-9]+*
+
+env:
+  CARGO_TERM_COLOR: always
+  UPLOAD_DIR_LINUX_X86_64: linux_artifacts-x86_64
+  UPLOAD_DIR_LINUX_AARCH64: linux_artifacts-aarch64
+  UPLOAD_DIR_DEB_X86_64: deb_artifacts-x86_64
+  UPLOAD_DIR_DEB_AARCH64: deb_artifacts-aarch64
+  UPLOAD_DIR_ANDROID: android_artifacts
+  UPLOAD_DIR_WINDOWS_X64: windows_core_artifacts_x64
+  UPLOAD_DIR_WINDOWS_ARM64: windows_core_artifacts_arm64
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build-nym-vpn-core-linux:
+    uses: ./.github/workflows/build-nym-vpn-core-linux.yml
+    secrets:
+      VPND_SENTRY_DSN: ${{ secrets.VPND_SENTRY_DSN }}
+
+  build-nym-vpn-core-deb:
+    uses: ./.github/workflows/build-nym-vpn-core-deb.yml
+
+  build-nym-vpn-core-android:
+    uses: ./.github/workflows/build-nym-vpn-core-android.yml
+
+  build-nym-vpn-core-windows:
+    uses: ./.github/workflows/build-nym-vpn-core-windows.yml
+    with:
+      cpu_arch: x64
+    secrets:
+      VPND_SENTRY_DSN: ${{ secrets.VPND_SENTRY_DSN }}
+
+  build-nym-vpn-core-windows-arm64:
+    uses: ./.github/workflows/build-nym-vpn-core-windows.yml
+    with:
+      cpu_arch: ARM64
+    secrets:
+      VPND_SENTRY_DSN: ${{ secrets.VPND_SENTRY_DSN }}
+
+  generate-build-info-core:
+    uses: ./.github/workflows/generate-build-info-core.yml
+    needs: build-nym-vpn-core-linux
+    with:
+      build-profile: release
+      rust-version: ${{ needs.build-nym-vpn-core-linux.outputs.RUST_VERSION }}
+
+  publish:
+    needs:
+      - build-nym-vpn-core-linux
+      - build-nym-vpn-core-deb
+      - build-nym-vpn-core-android
+      - build-nym-vpn-core-windows
+      - build-nym-vpn-core-windows-arm64
+      - generate-build-info-core
+    runs-on: arc-linux-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.set_tag.outputs.tag }}
+      ok_to_publish: ${{ steps.determine-ok-to-publish.outputs.ok_to_publish }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Dotenv Action
+        uses: xom9ikk/dotenv@v2.4.0
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update && sudo apt install -y gettext-base gh zip
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+
+      - name: Get nym-vpn-core workspace version
+        id: workspace-version-pre
+        uses: nicolaiunrein/cargo-get@master
+        with:
+          subcommand: workspace.package.version --entry nym-vpn-core
+
+      - name: Install cargo-edit
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-edit
+
+      - name: Append timestamp if it's a pre-release version
+        run: ./scripts/append-timestamp-to-version.sh nym-vpn-core/Cargo.toml ${{ steps.workspace-version-pre.outputs.metadata }}
+
+      - name: Get nym-vpn-core workspace version (post-append)
+        id: workspace-version
+        uses: nicolaiunrein/cargo-get@master
+        with:
+          subcommand: workspace.package.version --entry nym-vpn-core
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+
+      - name: Determine if we should publish
+        id: determine-ok-to-publish
+        run: |
+          version="${{ steps.workspace-version.outputs.metadata }}"
+          should_publish="false"
+          # If version does NOT contain '-' => stable => auto-publish
+          if [[ "$version" != *"-"* ]]; then
+            should_publish="true"
+          fi
+          # Or if the user explicitly sets publish_to_github
+          if [[ "${{ inputs.publish_to_github }}" == "true" ]]; then
+            should_publish="true"
+          fi
+          echo "ok_to_publish=$should_publish" >> "$GITHUB_OUTPUT"
+
+      # Setup TAG_NAME, which is used as a general "name"
+      - if: github.event_name == 'workflow_dispatch'
+        run: echo "TAG_NAME=nym-vpn-core-v${{ steps.workspace-version.outputs.metadata }}" >> $GITHUB_ENV
+      - if: github.event_name == 'schedule'
+        run: echo 'TAG_NAME=nym-vpn-core-nightly' >> $GITHUB_ENV
+      - if: github.event_name == 'push'
+        run: echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Set tag
+        id: set_tag
+        run: echo "tag=${{ env.TAG_NAME }}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate checksums and create tar.gz archive per platform
+        env:
+          BASENAME: nym-vpn-core-v${{ steps.workspace-version.outputs.metadata }}
+        run: |
+          ARCHIVE_LINUX_X86_64=${BASENAME}_linux_x86_64
+          ARCHIVE_LINUX_AARCH64=${BASENAME}_linux_aarch64
+          ARCHIVE_ANDROID=${BASENAME}_android_aarch64
+          ARCHIVE_WINDOWS_X64=${BASENAME}_windows_x86_64
+          ARCHIVE_WINDOWS_ARM64=${BASENAME}_windows_aarch64
+          echo "ARCHIVE_LINUX_X86_64=${ARCHIVE_LINUX_X86_64}" >> $GITHUB_ENV
+          echo "ARCHIVE_LINUX_AARCH64=${ARCHIVE_LINUX_AARCH64}" >> $GITHUB_ENV
+          echo "ARCHIVE_ANDROID=${ARCHIVE_ANDROID}" >> $GITHUB_ENV
+          echo "ARCHIVE_WINDOWS_X64=${ARCHIVE_WINDOWS_X64}" >> $GITHUB_ENV
+          echo "ARCHIVE_WINDOWS_ARM64=${ARCHIVE_WINDOWS_ARM64}" >> $GITHUB_ENV
+
+          mv -v ${{ env.UPLOAD_DIR_LINUX_X86_64 }} ${ARCHIVE_LINUX_X86_64}
+          mv -v ${{ env.UPLOAD_DIR_LINUX_AARCH64 }} ${ARCHIVE_LINUX_AARCH64}
+          mv -v ${{ env.UPLOAD_DIR_ANDROID }} ${ARCHIVE_ANDROID}
+          mv -v ${{ env.UPLOAD_DIR_WINDOWS_X64 }} ${ARCHIVE_WINDOWS_X64}
+          mv -v ${{ env.UPLOAD_DIR_WINDOWS_ARM64 }} ${ARCHIVE_WINDOWS_ARM64}
+
+          test -d ${ARCHIVE_LINUX_X86_64} && tar cvzf ${ARCHIVE_LINUX_X86_64}.tar.gz ${ARCHIVE_LINUX_X86_64}
+          test -d ${ARCHIVE_LINUX_AARCH64} && tar cvzf ${ARCHIVE_LINUX_AARCH64}.tar.gz ${ARCHIVE_LINUX_AARCH64}
+          test -d ${ARCHIVE_ANDROID} && tar cvzf ${ARCHIVE_ANDROID}.tar.gz ${ARCHIVE_ANDROID}
+          test -d ${ARCHIVE_WINDOWS_X64} && zip -r ${ARCHIVE_WINDOWS_X64}.zip ${ARCHIVE_WINDOWS_X64}
+          test -d ${ARCHIVE_WINDOWS_ARM64} && zip -r ${ARCHIVE_WINDOWS_ARM64}.zip ${ARCHIVE_WINDOWS_ARM64}
+
+          test -f ${ARCHIVE_LINUX_X86_64}.tar.gz && sha256sum ${ARCHIVE_LINUX_X86_64}.tar.gz > "${ARCHIVE_LINUX_X86_64}.tar.gz.sha256sum"
+          test -f ${ARCHIVE_LINUX_AARCH64}.tar.gz && sha256sum ${ARCHIVE_LINUX_AARCH64}.tar.gz > "${ARCHIVE_LINUX_AARCH64}.tar.gz.sha256sum"
+          test -f ${ARCHIVE_ANDROID}.tar.gz && sha256sum ${ARCHIVE_ANDROID}.tar.gz > "${ARCHIVE_ANDROID}.tar.gz.sha256sum"
+          test -f ${ARCHIVE_WINDOWS_X64}.zip && sha256sum ${ARCHIVE_WINDOWS_X64}.zip > "${ARCHIVE_WINDOWS_X64}.zip.sha256sum"
+          test -f ${ARCHIVE_WINDOWS_ARM64}.zip && sha256sum ${ARCHIVE_WINDOWS_ARM64}.zip > "${ARCHIVE_WINDOWS_ARM64}.zip.sha256sum"
+
+          if [[ -d ${{ env.UPLOAD_DIR_DEB_X86_64 }} ]]; then
+            pushd ${{ env.UPLOAD_DIR_DEB_X86_64 }}
+            for deb in *.deb; do
+              sha256sum ${deb} > ${deb}.sha256sum
+            done
+            popd
+          fi
+          if [[ -d ${{ env.UPLOAD_DIR_DEB_AARCH64 }} ]]; then
+            pushd ${{ env.UPLOAD_DIR_DEB_AARCH64 }}
+            for deb in *.deb; do
+              sha256sum ${deb} > ${deb}.sha256sum
+            done
+            popd
+          fi
+
+          echo 'SHA256_CHECKSUMS<<EOF' >> $GITHUB_ENV
+          cat ${ARCHIVE_LINUX_X86_64}.tar.gz.sha256sum >> $GITHUB_ENV
+          cat ${ARCHIVE_LINUX_AARCH64}.tar.gz.sha256sum >> $GITHUB_ENV
+          cat ${ARCHIVE_ANDROID}.tar.gz.sha256sum >> $GITHUB_ENV
+          cat ${ARCHIVE_WINDOWS_X64}.zip.sha256sum >> $GITHUB_ENV
+          cat ${ARCHIVE_WINDOWS_ARM64}.zip.sha256sum >> $GITHUB_ENV
+
+          if [[ -d ${{ env.UPLOAD_DIR_DEB_X86_64 }} ]]; then
+            pushd ${{ env.UPLOAD_DIR_DEB_X86_64 }}
+            for deb_sha256 in *.sha256sum; do
+              cat ${deb_sha256} >> $GITHUB_ENV
+            done
+          fi
+          if [[ -d ${{ env.UPLOAD_DIR_DEB_AARCH64 }} ]]; then
+            pushd ${{ env.UPLOAD_DIR_DEB_AARCH64 }}
+            for deb_sha256 in *.sha256sum; do
+              cat ${deb_sha256} >> $GITHUB_ENV
+            done
+          fi
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Setting subject and notes files
+        run: |
+          (echo "SUBJECT=$TAG_NAME"
+           echo 'NOTES_FILE=release-notes/release-notes-core.md') >> $GITHUB_ENV
+
+      - name: Build info
+        run: |
+          echo 'BUILD_INFO<<EOF' >> $GITHUB_ENV
+          cat build-info/build-info.txt >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
+
+      - name: Publish release to github
+        if: ${{ steps.determine-ok-to-publish.outputs.ok_to_publish == 'true' }}
+        run: |
+          echo "Setting up the release notes"
+          envsubst < "$GITHUB_WORKSPACE/.github/workflows/$NOTES_FILE" > "$RUNNER_TEMP/release-notes.md"
+          echo "Creating the release"
+          gh release create $TAG_NAME \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --title "$SUBJECT" \
+            --target $GITHUB_SHA \
+            ${{ env.ARCHIVE_LINUX_X86_64 }}.tar.gz ${{ env.ARCHIVE_LINUX_X86_64 }}.tar.gz.sha256sum \
+            ${{ env.ARCHIVE_LINUX_AARCH64 }}.tar.gz ${{ env.ARCHIVE_LINUX_AARCH64 }}.tar.gz.sha256sum \
+            ${{ env.ARCHIVE_ANDROID }}.tar.gz ${{ env.ARCHIVE_ANDROID }}.tar.gz.sha256sum \
+            ${{ env.ARCHIVE_WINDOWS_X64 }}.zip ${{ env.ARCHIVE_WINDOWS_X64 }}.zip.sha256sum \
+            ${{ env.ARCHIVE_WINDOWS_ARM64 }}.zip ${{ env.ARCHIVE_WINDOWS_ARM64 }}.zip.sha256sum \
+            ${{ env.UPLOAD_DIR_DEB_X86_64 }}/*.{deb,sha256sum} \
+            ${{ env.UPLOAD_DIR_DEB_AARCH64 }}/*.{deb,sha256sum}
+
+      # Upload to CI server
+
+      - name: Prepare build output directory
+        shell: bash
+        env:
+          OUTPUT_DIR_BASE: ci-builds/${{ github.ref_name }}
+        run: |
+          TIMESTAMP=$(date +%Y%m%d%H%M) # Short and suitable for paths
+          OUTPUT_DIR="$OUTPUT_DIR_BASE/$TIMESTAMP"
+          echo "OUTPUT_DIR=$OUTPUT_DIR" >> $GITHUB_ENV
+          rm -rf ci-builds || true
+          mkdir -p $OUTPUT_DIR
+          echo $OUTPUT_DIR
+
+      - name: Prepare build output artifacts
+        shell: bash
+        run: |
+          cp -v ${{ env.ARCHIVE_LINUX_X86_64 }}.tar.gz ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.ARCHIVE_LINUX_X86_64 }}.tar.gz.sha256sum ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.ARCHIVE_LINUX_AARCH64 }}.tar.gz ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.ARCHIVE_LINUX_AARCH64 }}.tar.gz.sha256sum ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.ARCHIVE_ANDROID }}.tar.gz ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.ARCHIVE_ANDROID }}.tar.gz.sha256sum ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.ARCHIVE_WINDOWS_X64 }}.zip ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.ARCHIVE_WINDOWS_X64 }}.zip.sha256sum ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.ARCHIVE_WINDOWS_ARM64 }}.zip ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.ARCHIVE_WINDOWS_ARM64 }}.zip.sha256sum ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.UPLOAD_DIR_DEB_X86_64 }}/*.{deb,sha256sum} ${{ env.OUTPUT_DIR }}
+          cp -v ${{ env.UPLOAD_DIR_DEB_AARCH64 }}/*.{deb,sha256sum} ${{ env.OUTPUT_DIR }}
+
+      - name: Upload to www
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.CI_WWW_SSH_PRIVATE_KEY }}
+          ARGS: "-avzr"
+          SOURCE: "ci-builds/"
+          REMOTE_HOST: ${{ secrets.CI_WWW_REMOTE_HOST }}
+          REMOTE_USER: ${{ secrets.CI_WWW_REMOTE_USER }}
+          TARGET: ${{ secrets.CI_WWW_REMOTE_TARGET }}/builds/nym-vpn-client/nym-vpn-core
+
+  gen-hashes:
+    needs: publish
+    if: ${{ needs.publish.outputs.ok_to_publish == 'true' }}
+    uses: ./.github/workflows/gen-hashes-json.yml
+    with:
+      release_tag: ${{ needs.publish.outputs.tag }}
+    secrets: inherit

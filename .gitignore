@@ -1,0 +1,58 @@
+**/*.rs.bk
+/*/target
+target/
+build/
+/android/
+bin/
+.env/
+.env.dev/
+.vscode/
+.zed/
+.idea/
+**/.DS_Store
+/.cargo
+/nym-vpn-core/.cargo
+nym-vpn-apple/MixnetLibrary/Sources/MixnetLibrary/RustFramework.xcframework
+.lldbinit
+
+# Wireguard-go artifacts
+wireguard/libwg/versioninfo_windows.syso
+wireguard/libwg/exports.def
+wireguard/libwg/libwg.exp
+wireguard/libwg/libwg.h
+
+# Auto-generated version headers
+wireguard/libwg/version.h
+nym-vpn-windows/winfw/src/winfw/version.h
+
+# uniffi binaries
+nym-vpn-core/crates/nym-vpn-rpc-uniffi/generated
+nym-vpn-core/crates/nym-vpn-rpc-uniffi/NymVPNRpc
+nym-vpn-core/crates/nym-vpn-lib-uniffi/generated
+nym-vpn-core/crates/nym-vpn-lib-uniffi/NymVPNLib
+
+# nym-vpnd
+nym-vpn-core/upload/mac
+
+# Visual Studio
+*.vcxproj.user
+.vs/
+
+# AI tools
+.github/copilot-instructions.md
+.claude/
+
+# Fastlane reports
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/readme.md
+
+# Lab local-run runtime (binaries, credentials, logs — not source)
+.env
+local-run/bin/
+local-run/data/
+local-run/cache/
+local-run/log/
+local-run/*.pid

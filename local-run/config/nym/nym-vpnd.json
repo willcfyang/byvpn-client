@@ -1,0 +1,60 @@
+{
+  "version": "v10",
+  "entry_point": {
+    "gateway": {
+      "identity": "3yJCWPL4X8KXNH86gYpP5LmN165Rru2jAEyxiWr9vQyP"
+    }
+  },
+  "exit_point": {
+    "gateway": {
+      "identity": "D5p6S6wiPvGYfJme5dkGvPgvcMo7Jq7FPQga3Dhhn2Vf"
+    }
+  },
+  "allow_lan": true,
+  "disable_ipv6": false,
+  "enable_two_hop": true,
+  "enable_bridges": false,
+  "enable_lewes_protocol": false,
+  "enable_ad_blocking": false,
+  "fronting_mode": "off",
+  "netstack": false,
+  "min_gateway_vpn_performance": null,
+  "residential_exit": false,
+  "enable_custom_dns": true,
+  "custom_dns": [
+    "8.8.8.8",
+    "1.1.1.1"
+  ],
+  "mixnet_traffic": {
+    "poisson_parameter_for_loop_cover_stream": null,
+    "average_packet_delay": null,
+    "message_sending_average_delay": null,
+    "disable_poisson_rate": false,
+    "disable_background_cover_traffic": false,
+    "min_mixnode_performance": null,
+    "min_gateway_mixnet_performance": null
+  },
+  "network_stats": {
+    "enabled": true,
+    "allow_disconnected": false
+  },
+  "split_tunnel": {
+    "enabled": false,
+    "apps": []
+  },
+  "geo_exclusion": {
+    "enabled": true,
+    "listen_port": 1080,
+    "excluded_countries": [
+      "CN"
+    ]
+  },
+  "gateway_selection_algorithm_config": {
+    "enable_geo_location": true,
+    "gateway_selection_algorithm": "auto"
+  },
+  "gateway_independence": {
+    "different_node_family": true,
+    "different_asn": true
+  }
+}

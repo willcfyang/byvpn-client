@@ -1,0 +1,443 @@
+import Combine
+import Logging
+import SwiftUI
+import Foundation
+import AppSettings
+import AppVersionProvider
+import ConnectionTypes
+import ConfigurationManager
+import Constants
+import ErrorReason
+#if os(iOS)
+import ErrorHandler
+import ByVpnCore
+#elseif os(macOS)
+import GRPCManager
+#endif
+import PathManager
+
+@MainActor public final class CredentialsManager: ObservableObject {
+    private let logger = Logger(label: "CredentialsManager")
+#if os(macOS)
+    private let grpcManager = GRPCManager.shared
+#endif
+    private let appSettings = AppSettings.shared
+    private let configurationManager = ConfigurationManager.shared
+
+#if os(iOS)
+    var deeplinks: NymDeeplinks?
+#endif
+    private var cancellables = Set<AnyCancellable>()
+    private var isUpdatingAccountSummary = false
+
+    public static let shared = CredentialsManager()
+
+    @Published public var deviceIdentifier: String?
+    @Published public var accountIdentifier: String?
+    @Published public var didReceiveAccountLinkCallback = false
+    @Published public var didReceiveSubscriptionPayment = false
+    /// True when the last `fetchAccountSummary` attempt failed (use for UI signal).
+    @Published public private(set) var accountSummaryLastFetchFailed = false
+
+    @Published public var accountSummary: AccountSummary? = AppSettings.shared.accountSummary {
+        didSet { appSettings.accountSummary = accountSummary }
+    }
+
+    public var isValidCredentialImported: Bool {
+        appSettings.isCredentialImported
+    }
+
+    public var accountToken: String? {
+        appSettings.accountToken
+    }
+
+    private init() {}
+
+    public func setup() {
+#if os(iOS)
+        checkCredentialImport()
+#elseif os(macOS)
+        setupGRPCManagerObservers()
+#endif
+    }
+
+    public func add(credential: String) async throws {
+        try await Task {
+            do {
+#if os(iOS)
+                try await ByVpnAccountStorage(
+                    dataDir: PathManager.dataFolderURL().path(),
+                    environment: configurationManager.networkEnv ?? .newWithMainnetFallback()
+                ).login(request: .vpn(mnemonic: credential))
+#elseif os(macOS)
+                try await grpcManager.storeAccount(with: .vpn(mnemonic: credential))
+#endif
+                checkCredentialImport()
+            } catch {
+#if os(iOS)
+                if let vpnError = error as? VpnError {
+                    throw VPNErrorReason(with: vpnError)
+                } else {
+                    throw error
+                }
+#elseif os(macOS)
+                throw error
+#endif
+            }
+        }.value
+    }
+
+    public func createMnemonic() async throws {
+#if os(iOS)
+        try await Task {
+            try await ByVpnAccountStorage(
+                dataDir: PathManager.dataFolderURL().path(),
+                environment: configurationManager.networkEnv ?? .newWithMainnetFallback()
+            ).createAccount()
+            Task { @MainActor in
+                checkCredentialImport()
+            }
+        }.value
+#endif
+    }
+
+    public func mnemonic() async throws -> String {
+#if os(iOS)
+        try await Task {
+            try await ByVpnAccountStorage(
+                dataDir: PathManager.dataFolderURL().path(),
+                environment: configurationManager.networkEnv ?? .newWithMainnetFallback()
+            ).getStoredMnemonic()
+        }.value
+#elseif os(macOS)
+        // TODO: add missing grpc
+        return ""
+#endif
+    }
+
+    public func registerAccount() async throws {
+#if os(iOS)
+        do {
+            let result = try await ByVpnAccountStorage(
+                dataDir: PathManager.dataFolderURL().path(),
+                environment: configurationManager.networkEnv ?? .newWithMainnetFallback()
+            ).registerAccount()
+            Task { @MainActor in
+                appSettings.accountToken = result.accountToken
+                checkCredentialImport()
+            }
+        }
+#endif
+    }
+
+    public func removeCredential() async throws {
+        try await Task {
+            do {
+#if os(iOS)
+                try await ByVpnAccountStorage(
+                    dataDir: PathManager.dataFolderURL().path(),
+                    environment: configurationManager.networkEnv ?? .newWithMainnetFallback()
+                ).forgetAccount()
+#elseif os(macOS)
+                try await grpcManager.forgetAccount()
+#endif
+                checkCredentialImport()
+            } catch {
+                // TODO: need modal for alerts
+                throw error
+            }
+            Task { @MainActor in
+                appSettings.accountToken = nil
+                accountSummary = nil
+            }
+        }.value
+    }
+
+    public func privyLogin(kind: ByVpnDeeplinkKind) async throws -> String? {
+        didReceiveAccountLinkCallback = false
+        let locale = Locale.current.language.languageCode?.identifier.lowercased() ?? "en"
+        let name = "default"
+#if os(iOS)
+        guard let networkEnv = configurationManager.networkEnv else { return nil }
+
+        deeplinks = NymDeeplinks(networkEnv: networkEnv)
+        return try await deeplinks?.getDeeplink(
+            params: .init(
+                client: .mobile,
+                locale: locale,
+                kind: kind.deeplinkKind,
+                name: name
+            )
+        )
+#elseif os(macOS)
+        return try await grpcManager.privyLogin(locale: locale, name: name, kind: kind)
+#endif
+    }
+
+    public func storeDeeplink(callbackURLString: String) async throws {
+#if os(iOS)
+        guard let deeplinks, let networkEnv = configurationManager.networkEnv else { return }
+        let mnemonic = try await deeplinks.deriveMnemonic(deeplinkCallbackUrl: callbackURLString)
+        try await ByVpnAccountStorage(
+            dataDir: PathManager.dataFolderURL().path(),
+            environment: networkEnv
+        ).loginWithDeeplinkMnemonic(deeplinkMnemonic: mnemonic)
+        self.deeplinks = nil
+        checkCredentialImport()
+#elseif os(macOS)
+        try await grpcManager.storePrivyAccount(with: callbackURLString)
+        checkCredentialImport()
+#endif
+        didReceiveAccountLinkCallback = true
+    }
+
+    public func handleSubscriptionPayment() async throws {
+#if os(macOS)
+        didReceiveSubscriptionPayment = true
+        try await grpcManager.handleSubscriptionPayment()
+        try? await Task.sleep(for: .seconds(2))
+        await updateAccountSummary(force: true)
+#endif
+    }
+
+    public func autologin(kind: ByVpnDeeplinkKind) async throws -> (url: String, pinCode: String)? {
+        let locale = Locale.current.language.languageCode?.identifier.lowercased() ?? "en"
+        let name = "default"
+#if os(iOS)
+        guard let networkEnv = configurationManager.networkEnv else { return nil }
+        let result = try await ByVpnAccountStorage(
+            dataDir: PathManager.dataFolderURL().path(),
+            environment: networkEnv
+        ).getAutologinDeeplink(
+            params: .init(
+                client: .mobile,
+                locale: locale,
+                kind: kind.deeplinkKind,
+                name: "name"
+            )
+        )
+        return (url: result.url, pinCode: result.pinCode)
+#elseif os(macOS)
+        return try await grpcManager.autologin(locale: locale, name: name, deeplinkKind: kind)
+#endif
+    }
+
+    /// Fetches account summary from API if current accountSummary.validUntilDate does not exist or is in past,
+    /// Returns true if the account subscription is active.
+    /// Uses `isActive` from AccountSummary (backend source of truth),
+    /// falling back to local date check if accountSummary is nil.
+    public func isAccountValid() async -> Bool {
+        if isAccountActive() {
+            return true
+        } else {
+            await updateAccountSummary(force: true)
+            return isAccountActive()
+        }
+    }
+
+    /// Checks `isActive` from backend, falls back to date check if summary is nil.
+    public func isAccountActive() -> Bool {
+        if let accountSummary {
+            return accountSummary.isActive
+        }
+        return isAccountSubscriptionDateValid()
+    }
+
+    public func updateAccountSummary(force: Bool = false, untilActive: Bool = false) async {
+        guard !isUpdatingAccountSummary else { return }
+        if !force && accountSummary != nil && isAccountSummaryCacheFresh() && isAccountActive() {
+            return
+        }
+        isUpdatingAccountSummary = true
+        defer { isUpdatingAccountSummary = false }
+
+        let delays: [Duration] = [.zero, .seconds(2), .seconds(4), .seconds(6), .seconds(10)]
+
+        for delay in delays {
+            if delay != .zero {
+                try? await Task.sleep(for: delay)
+            }
+            await fetchAccountSummary()
+            if untilActive {
+                if accountSummary?.isActive == true { break }
+            } else {
+                if accountSummary != nil { break }
+            }
+        }
+        resetExpiryDismissalsIfNeeded()
+    }
+
+    private func fetchAccountSummary() async {
+#if os(iOS)
+        // NYM-1156: don't `try?` - swallowed errors hang the UI.
+        let summary: VpnAccountSummary?
+        do {
+            summary = try await ByVpnAccountStorage(
+                dataDir: PathManager.dataFolderURL().path(),
+                environment: configurationManager.networkEnv ?? .newWithMainnetFallback()
+            ).getAccountSummary()
+        } catch {
+            accountSummaryLastFetchFailed = true
+            logger.error(
+                "fetchAccountSummary (iOS) failed operation=getAccountSummary \(Self.sanitizedAccountSummaryErrorLog(error))"
+            )
+            return
+        }
+
+        guard let summary else {
+            // nil-without-throw: same UX as a failure, surface it as one.
+            logger.debug("fetchAccountSummary (iOS): getAccountSummary returned nil without throwing")
+            accountSummaryLastFetchFailed = true
+            return
+        }
+
+        accountSummaryLastFetchFailed = false
+        let innerSub = summary.subscription?.subscription
+        accountSummary = AccountSummary(
+            validUntilTimeInterval: innerSub?.validUntilUtc,
+            trafficUsedGb: summary.trafficUsedGb,
+            trafficLimitGb: summary.trafficLimitGb,
+            trafficResetTimeInterval: summary.trafficResetTime,
+            accountAddress: summary.accountAddr,
+            cannonicalAccountAddress: summary.canonicalAccountAddr,
+            accountAuthMethod: summary.authMethods.map { AccountAuthMethod(vpnAccountMethod: $0) },
+            isLinked: summary.isLinked(),
+            isActive: summary.isSubscriptionActive(),
+            isAutoRenewEnabled: innerSub?.isRecurring ?? false,
+            subscription: summary.subscription.map { Subscription(from: $0) }
+        )
+#elseif os(macOS)
+        // On gRPC failure keep the last good summary; only flag the failure.
+        do {
+            accountSummary = try await grpcManager.accountSummary()
+            accountSummaryLastFetchFailed = false
+        } catch {
+            accountSummaryLastFetchFailed = true
+            logger.error(
+                "fetchAccountSummary (macOS) failed operation=accountSummary \(Self.sanitizedAccountSummaryErrorLog(error))"
+            )
+        }
+#endif
+    }
+
+    private func resetExpiryDismissalsIfNeeded() {
+        guard let accountSummary,
+              accountSummary.isActive,
+              !accountSummary.isExpiringSoon,
+              !accountSummary.isExpiringWarning
+        else {
+            return
+        }
+        appSettings.expiryWarningDismissedAt = 0
+        appSettings.expirySoonDismissedAt = 0
+    }
+}
+
+private extension CredentialsManager {
+    static func sanitizedAccountSummaryErrorLog(_ error: Error) -> String {
+        "errorType=\(String(describing: Swift.type(of: error)))"
+    }
+
+    func setupGRPCManagerObservers() {
+#if os(macOS)
+        grpcManager.$errorReason.sink { [weak self] error in
+            guard let self,
+                  let errorReason = error as? ErrorReason,
+                  errorReason == .noAccountStored
+            else {
+                return
+            }
+            Task { @MainActor in
+                self.appSettings.isCredentialImported = false
+            }
+        }
+        .store(in: &cancellables)
+
+        grpcManager.$isServing.sink { [weak self] isServing in
+            guard let self, isServing else { return }
+            checkCredentialImport()
+        }
+        .store(in: &cancellables)
+#endif
+    }
+}
+
+private extension CredentialsManager {
+    /// Checks if accountSummary.validUntilDate is in the future
+    /// - Returns: Bool
+    func isAccountSubscriptionDateValid() -> Bool {
+        guard let validUntilDate = accountSummary?.validUntilDate,
+              validUntilDate > Date()
+        else {
+            return false
+        }
+        return true
+    }
+
+    func checkCredentialImport() {
+        Task {
+            do {
+                let isImported: Bool
+#if os(iOS)
+                guard let networkEnv = configurationManager.networkEnv else { return }
+                isImported = try await ByVpnAccountStorage(
+                    dataDir: PathManager.dataFolderURL().path(),
+                    environment: networkEnv
+                ).isAccountMnemonicStored()
+#elseif os(macOS)
+                isImported = try await grpcManager.isAccountStored()
+#endif
+                updateIsCredentialImported(with: isImported)
+            } catch {
+                logger.error("Failed to check credential import: \(error.localizedDescription)")
+                updateIsCredentialImported(with: false)
+            }
+            await updateDeviceIdentifier()
+            await updateAccountIdentifier()
+            await updateAccountSummary()
+        }
+    }
+
+    func updateIsCredentialImported(with value: Bool) {
+        Task { @MainActor in
+            guard appSettings.isCredentialImported != value else { return }
+            appSettings.isCredentialImported = value
+        }
+    }
+}
+
+private extension CredentialsManager {
+    func updateDeviceIdentifier() async {
+#if os(iOS)
+        guard let networkEnv = configurationManager.networkEnv else { return }
+        deviceIdentifier = try? await ByVpnAccountStorage(
+            dataDir: PathManager.dataFolderURL().path(),
+            environment: networkEnv
+        ).getDeviceIdentity()
+#elseif os(macOS)
+        deviceIdentifier = try? await grpcManager.deviceIdentifier()
+#endif
+    }
+
+    func isAccountSummaryCacheFresh() -> Bool {
+        let accountSummaryCacheTTL = TimeInterval(24 * 60 * 60)
+        let lastFetched = appSettings.accountSummaryLastFetchedAt
+        guard lastFetched > 0 else { return false }
+        return Date().timeIntervalSince1970 - lastFetched < accountSummaryCacheTTL
+    }
+
+    func updateAccountIdentifier() async {
+        let newAccIdentifier: String?
+#if os(iOS)
+        newAccIdentifier = try? await ByVpnAccountStorage(
+            dataDir: PathManager.dataFolderURL().path(),
+            environment: configurationManager.networkEnv ?? .newWithMainnetFallback()
+        ).getAccountIdentity()
+#elseif os(macOS)
+        newAccIdentifier = try? await grpcManager.accountIdentifier()
+#endif
+        Task { @MainActor in
+            accountIdentifier = newAccIdentifier
+        }
+    }
+}

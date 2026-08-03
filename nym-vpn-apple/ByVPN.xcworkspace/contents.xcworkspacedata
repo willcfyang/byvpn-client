@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:ByVPN.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:AutoUpdates">
+   </FileRef>
+   <FileRef
+      location = "group:Home">
+   </FileRef>
+   <FileRef
+      location = "group:Routes">
+   </FileRef>
+   <FileRef
+      location = "group:Services">
+   </FileRef>
+   <FileRef
+      location = "group:ServicesMutual">
+   </FileRef>
+   <FileRef
+      location = "group:ServicesIOS">
+   </FileRef>
+   <FileRef
+      location = "group:ServicesMacOS">
+   </FileRef>
+   <FileRef
+      location = "group:Settings">
+   </FileRef>
+   <FileRef
+      location = "group:Theme">
+   </FileRef>
+   <FileRef
+      location = "group:UIComponents">
+   </FileRef>
+   <FileRef
+      location = "group:WidgetShared">
+   </FileRef>
+</Workspace>

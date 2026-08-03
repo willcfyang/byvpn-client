@@ -1,0 +1,168 @@
+import SwiftUI
+import AppSettings
+import Constants
+import CredentialsManager
+import ConnectionManager
+import ConfigurationManager
+#if os(iOS)
+import KeyboardManager
+#endif
+import Routes
+import Theme
+
+@MainActor final class AddCredentialsViewModel: ObservableObject {
+    private let credentialsManager: CredentialsManager
+    private let configurationManager: ConfigurationManager
+#if os(iOS)
+    private let keyboardManager: KeyboardManager
+#endif
+    private let newToByVPNTitle = "addCredentials.newToByVPN".localizedString
+    private let createAccountTitle = "createAccount".localizedString
+
+
+    @Binding private var path: NavigationPath
+
+    let appSettings: AppSettings
+    let scannerIconName = "qrcode.viewfinder"
+    let navigationSource: AddCredentialsNavigationSource
+    let createAccounAppLink = "app://createAccount"
+
+    var signUpLink: String {
+        if let link = configurationManager.accountLinks?.signUp, !link.isEmpty {
+            link
+        } else {
+            Constants.pricingURL.rawValue
+        }
+    }
+
+    @MainActor @Published var credentialText = "" {
+        willSet(newText) {
+            guard newText != credentialText else { return }
+            error = CredentialsManagerError.noError
+
+            scannerDidScanQRCode()
+        }
+    }
+    @Published var error: Error = CredentialsManagerError.noError {
+        didSet {
+            configureError()
+        }
+    }
+    @Published var textFieldStrokeColor = Color.ByVpn.gray2
+    @Published var credentialSubtitleColor = Color.ByVpn.textPrimary
+    @Published var bottomPadding: CGFloat = 8
+    @Published var errorMessageTitle = ""
+    @MainActor @Published var isScannerDisplayed = false
+    @Published var isFocused = true
+
+#if os(iOS)
+    init(
+        path: Binding<NavigationPath>,
+        appSettings: AppSettings,
+        credentialsManager: CredentialsManager,
+        configurationManager: ConfigurationManager,
+        keyboardManager: KeyboardManager,
+        navigationSource: AddCredentialsNavigationSource
+    ) {
+        _path = path
+        self.appSettings = appSettings
+        self.credentialsManager = credentialsManager
+        self.configurationManager = configurationManager
+        self.keyboardManager = keyboardManager
+        self.navigationSource = navigationSource
+    }
+#elseif os(macOS)
+    init(
+        path: Binding<NavigationPath>,
+        appSettings: AppSettings,
+        configurationManager: ConfigurationManager,
+        credentialsManager: CredentialsManager,
+        navigationSource: AddCredentialsNavigationSource
+    ) {
+        _path = path
+        self.appSettings = appSettings
+        self.configurationManager = configurationManager
+        self.credentialsManager = credentialsManager
+        self.navigationSource = navigationSource
+    }
+#endif
+
+    func createAnAccountAttributedString() -> AttributedString? {
+        try? AttributedString(markdown: "\(newToByVPNTitle) [\(createAccountTitle)](\(createAccounAppLink))")
+    }
+
+    @MainActor func importCredentials() {
+        let trimmedCredential = credentialText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        Task {
+            do {
+                try await credentialsManager.add(credential: trimmedCredential)
+                try await credentialsManager.registerAccount()
+                error = CredentialsManagerError.noError
+                credentialsDidAdd()
+            } catch let newError {
+                Task { @MainActor in
+                    credentialText = trimmedCredential
+                    error = CredentialsManagerError.generalError(String(describing: newError.localizedDescription))
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Navigation -
+extension AddCredentialsViewModel {
+    func navigateBack() {
+        switch navigationSource {
+        case .onboarding:
+            path = .init([HomeLink.onboarding])
+        case .accountWelcome:
+            if !path.isEmpty { path.removeLast() }
+        case .settings:
+            if !path.isEmpty { path.removeLast() }
+        }
+    }
+
+    func navigateToCreateAccount() {
+        path = NavigationPath([HomeLink.settings])
+        path.append(SettingLink.accountWelcome(type: .createAccount, navigationSource: .addCredential))
+    }
+
+    func navigateHomeOrTechnicalOptIn() {
+        if appSettings.welcomeScreenDidDisplay {
+            path = .init()
+        } else {
+            path = .init([HomeLink.technicalOptIns])
+        }
+    }
+}
+
+// MARK: - Private -
+extension AddCredentialsViewModel {
+    @MainActor func configureError() {
+        let error = error as? CredentialsManagerError
+
+        textFieldStrokeColor = error == .noError ? Color.ByVpn.gray2 : Color.ByVpn.error
+        credentialSubtitleColor = error == .noError ? Color.ByVpn.textPrimary : Color.ByVpn.error
+        bottomPadding = error != .noError ? 4 : 8
+
+        errorMessageTitle = (error == .noError ? "" : error?.localizedTitle)
+        ?? (CredentialsManagerError.generalError("").localizedTitle ?? "Error".localizedString)
+    }
+
+    @MainActor func credentialsDidAdd() {
+        credentialText = ""
+        navigateHomeOrTechnicalOptIn()
+    }
+
+    @MainActor func scannerDidScanQRCode() {
+#if os(iOS)
+        if isScannerDisplayed {
+            isFocused = false
+            isScannerDisplayed = false
+            keyboardManager.hideKeyboard()
+            importCredentials()
+        }
+#endif
+    }
+}

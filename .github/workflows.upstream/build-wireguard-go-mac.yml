@@ -1,0 +1,53 @@
+name: build-wireguard-go-mac
+
+on:
+  pull_request:
+    types: [opened]
+    paths:
+      - "wireguard/**"
+      - ".github/workflows/build-wireguard-go-mac.yml"
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-libwg:
+    runs-on: custom-macos-15
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout nym-vpn-client
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Dotenv Action
+        uses: xom9ikk/dotenv@v2.4.0
+
+      - name: Cache libwg
+        uses: actions/cache@v5
+        id: cache
+        with:
+          path: build/lib
+          key: libwg-macos-go${{ env.GOLANG_VERSION }}-${{ hashFiles('wireguard/libwg/**/*.{go,diff,mod,h}', 'wireguard/build-wireguard-go.sh') }}
+
+      - name: Install Go
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          cache-dependency-path: wireguard/libwg/go.sum
+
+      - name: Build wireguard
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: ./wireguard/build-wireguard-go.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: wireguard-go_apple_universal
+          path: build/lib/universal-apple-darwin
+          if-no-files-found: error
+          retention-days: 1

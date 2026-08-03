@@ -1,0 +1,80 @@
+name: build-wireguard-go-android
+on:
+  pull_request:
+    types: [opened]
+    paths:
+      - "wireguard/**"
+      - ".github/workflows/build-wireguard-go-android.yml"
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-libwg:
+    runs-on: arc-linux-latest
+
+    steps:
+      - name: Checkout nym-vpn-client
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Dotenv Action
+        uses: xom9ikk/dotenv@v2.4.0
+
+      - name: Cache libwg
+        uses: actions/cache@v5
+        id: cache
+        with:
+          path: build/lib
+          key: libwg-android-go${{ env.GOLANG_VERSION }}-${{ hashFiles('wireguard/libwg/**/*.{go,diff,mod,h}', 'wireguard/build-wireguard-go.sh') }}
+
+      - name: Install system dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
+      - name: Install Go
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          cache-dependency-path: wireguard/libwg/go.sum
+
+      - name: Setup NDK
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: false
+
+      - name: Set env
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          echo "ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
+          echo "NDK_TOOLCHAIN_DIR=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_ENV
+
+      - name: Build wireguard
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          ARCHITECTURES: aarch64 x86_64
+        run: ./wireguard/build-wireguard-go.sh --android
+
+      - name: Upload aarch64 artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: wireguard-go_aarch64-linux-android
+          path: build/lib/aarch64-linux-android
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload x86_64 artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: wireguard-go_x86_64-linux-android
+          path: build/lib/x86_64-linux-android
+          if-no-files-found: error
+          retention-days: 1

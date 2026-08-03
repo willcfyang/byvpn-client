@@ -1,0 +1,7 @@
+// ByVPN store branding — fill DEVELOPMENT_TEAM before Archive.
+// Bundle IDs are set in the Xcode project (com.byvpn.app.*).
+
+BYVPN_BUNDLE_PREFIX = com.byvpn.app
+// DEVELOPMENT_TEAM = YOUR_TEAM_ID
+PRODUCT_BUNDLE_IDENTIFIER = com.byvpn.app
+INFOPLIST_KEY_CFBundleDisplayName = ByVPN

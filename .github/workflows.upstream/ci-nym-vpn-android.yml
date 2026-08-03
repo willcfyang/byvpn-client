@@ -1,0 +1,94 @@
+name: ci-nym-vpn-android
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "nym-vpn-core/crates/**"
+      - "nym-vpn-core/Cargo.toml"
+      - "nym-vpn-core/Cargo.lock"
+      - "nym-vpn-core/Android.mk"
+      - "nym-vpn-android/**"
+      - ".github/workflows/ci-nym-vpn-android.yml"
+      - ".github/workflows/build-nym-vpn-android.yml"
+      - ".github/workflows/publish-nym-vpn-android.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  AGENT_ISSELFHOSTED: 1 # https://github.com/actions/setup-go/issues/432
+
+jobs:
+  check:
+    runs-on: arc-linux-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: nym-vpn-android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.env
+            /nym-vpn-android/
+
+      - name: Dotenv Action
+        uses: xom9ikk/dotenv@v2.4.0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "21"
+          cache: gradle
+
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y unzip rsync
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Cache NDK
+        uses: actions/cache@v5
+        id: cache-ndk
+        with:
+          path: /usr/local/lib/android/sdk/ndk/${{ env.NDK_VERSION }}
+          key: ndk-${{ env.NDK_VERSION }}
+          restore-keys: |
+            ndk-
+
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        timeout-minutes: 10
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: false
+
+      - name: Verify NDK Setup
+        run: |
+          echo "NDK Path: ${{ steps.setup-ndk.outputs.ndk-path }}"
+          if [ ! -d "${{ steps.setup-ndk.outputs.ndk-path }}" ]; then
+            echo "Error: NDK directory not found at ${{ steps.setup-ndk.outputs.ndk-path }}"
+            exit 1
+          fi
+          echo "NDK setup successful"
+
+      - name: Run ktlint
+        timeout-minutes: 10
+        run: ./gradlew ktlintCheck
+
+      - name: Run detekt
+        timeout-minutes: 10
+        run: ./gradlew detekt --info
+
+  build-nym-vpn-android:
+    uses: ./.github/workflows/build-nym-vpn-android.yml
+    with:
+      build_type: "debug"
+      build_format: "apk"
+    secrets:
+      SCCACHE_REDIS_ENDPOINT: ${{ secrets.SCCACHE_REDIS_ENDPOINT }}
+      SCCACHE_REDIS_PASSWORD: ${{ secrets.SCCACHE_REDIS_PASSWORD }}

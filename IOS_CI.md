@@ -22,7 +22,7 @@ Upstream Nym workflows (self-hosted `AppleSilicon`, Nym bundle IDs) live under `
 1. Open **Actions → build-byvpn-ios → Run workflow**
 2. `core_source`:
    - **fetch** (default): download prebuilt UniFFI core (`Scripts/FetchIOSCore.sh`)
-   - **build**: compile Rust core on the Mac runner (`Scripts/BuildCore.sh --debug`) — slower, burns more minutes
+   - **build**: compile Rust core on the Mac runner (`Scripts/BuildCore.sh --debug`) — slower, burns more minutes. Needs repo-root `nym-vpn-patches/` (lab nym path deps); the workflow symlinks it to `../../nym-vpn-patches` relative to `nym-vpn-core`.
 3. `signed`:
    - **false** (default): iOS Simulator smoke build with `CODE_SIGNING_ALLOWED=NO`
    - **true**: ad-hoc Archive + IPA (needs secrets below)

@@ -91,6 +91,24 @@ jobs:
           xcodebuild -version
           swift --version
 
+      # nym-vpn-core Cargo.toml uses path = "../../nym-vpn-patches/..." (sibling of
+      # the git checkout root). Repo stores patches at ./nym-vpn-patches; link them
+      # where Cargo expects on Actions (and any nested checkout layout).
+      - name: Link nym-vpn-patches for Cargo path deps
+        if: ${{ inputs.core_source == 'build' }}
+        working-directory: .
+        run: |
+          set -euo pipefail
+          test -f nym-vpn-patches/nym/nym-authenticator-client/Cargo.toml
+          # From nym-vpn-core: ../../nym-vpn-patches → parent of GITHUB_WORKSPACE
+          dest="$(cd "$GITHUB_WORKSPACE/.." && pwd)/nym-vpn-patches"
+          if [[ "$(cd nym-vpn-patches && pwd)" != "$dest" ]]; then
+            rm -rf "$dest"
+            ln -sfn "$(cd nym-vpn-patches && pwd)" "$dest"
+          fi
+          ls -ld "$dest"
+          test -f "$dest/nym/nym-authenticator-client/Cargo.toml"
+
       - name: Install Go (wireguard-go / core build)
         if: ${{ inputs.core_source == 'build' }}
         uses: actions/setup-go@v5

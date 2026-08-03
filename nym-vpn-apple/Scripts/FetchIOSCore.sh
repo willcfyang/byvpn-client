@@ -43,9 +43,10 @@ TAG_URL="${BASE_URL}/${TAG}"
 
 # Choose the iOS asset pattern after TAG is finalized
 if [[ "$TAG" =~ ^release/ ]]; then
-  ios_pattern='nym-vpn-core-v[0-9]+\.[0-9]+\.[0-9]+(-(?:dev|beta)\.[0-9]{12})?_ios_universal\.zip'
+  # Use POSIX ERE (grep -E); avoid PCRE (?:...) which fails on macOS/GNU grep -E.
+  ios_pattern='nym-vpn-core-v[0-9]+\.[0-9]+\.[0-9]+(-(dev|beta)\.[0-9]{12})?_ios_universal\.zip'
 else
-  ios_pattern='nym-vpn-core-v[0-9]+\.[0-9]+\.[0-9]+-(?:dev|beta)\.[0-9]{12}_ios_universal\.zip'
+  ios_pattern='nym-vpn-core-v[0-9]+\.[0-9]+\.[0-9]+-(dev|beta)\.[0-9]{12}_ios_universal\.zip'
 fi
 
 echo "Using build tag: ${TAG}"

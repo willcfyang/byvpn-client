@@ -61,6 +61,10 @@ jobs:
           done
           ls -l wireguard/build-wireguard-go.sh nym-vpn-apple/Scripts/*.sh | head -40
 
+      # Seconds on the runner; catches rename leftovers before ~25min UniFFI burn.
+      - name: Static Swift rename contract
+        run: ./Scripts/verify-swift-rename-contract.sh
+
       - name: Select Xcode
         run: |
           set -euo pipefail

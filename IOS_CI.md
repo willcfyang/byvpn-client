@@ -70,7 +70,19 @@ Without Apple materials, use `signed=false` to validate that the project still c
 
 ## Cost note
 
-Private repos have limited free Actions minutes; **macOS minutes cost more** than Linux. Prefer `fetch` + simulator smoke until signing is ready. Do not enable push/PR triggers until you accept the burn rate.
+Private repos have limited free Actions minutes; **macOS minutes cost more** than Linux. Prefer `fetch` + simulator smoke until signing is ready. Do not enable push/PR triggers for `build-byvpn-ios` until you accept the burn rate.
+
+## Static checks (do this before macOS UniFFI)
+
+Many past smoke failures were **rename leftovers**, not Rust/Xcode bugs. Catch them in seconds:
+
+```bash
+cd nym-vpn-apple
+./Scripts/verify-swift-rename-contract.sh   # NymVpn↔ByVpn contract, UI leftovers, Constants dups
+./Scripts/verify-store-identity.sh          # bundle IDs / branding (needs ByVpnCore on disk)
+```
+
+Workflow `.github/workflows/static-byvpn-apple.yml` runs the rename contract on **Linux** for every push/PR touching `nym-vpn-apple/` (cheap). `build-byvpn-ios` also runs it **before** installing Rust / building UniFFI.
 
 ## Local Mac (alternative to Actions)
 

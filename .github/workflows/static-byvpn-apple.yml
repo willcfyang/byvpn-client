@@ -1,0 +1,36 @@
+name: static-byvpn-apple
+
+# Cheap Linux checks — run on push/PR so rename leftovers fail without macOS minutes.
+# Full simulator smoke stays on build-byvpn-ios (manual, macos-15).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "nym-vpn-apple/**"
+      - ".github/workflows/static-byvpn-apple.yml"
+  pull_request:
+    paths:
+      - "nym-vpn-apple/**"
+      - ".github/workflows/static-byvpn-apple.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: static-byvpn-apple-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rename-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Install ripgrep
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep
+      - name: Static Swift rename contract
+        working-directory: nym-vpn-apple
+        run: |
+          chmod +x Scripts/verify-swift-rename-contract.sh
+          ./Scripts/verify-swift-rename-contract.sh

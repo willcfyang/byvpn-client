@@ -71,11 +71,27 @@ fi
 LIB_DEST="${APPLE_ROOT}/ByVpnCore"
 rm -rf "${LIB_DEST}"
 cp -R "${LIB_SRC}" "${LIB_DEST}"
-# Normalize module name for store differentiation
-find "${LIB_DEST}" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0 \
-  | xargs -0 sed -i '' 's/NymVPNLib/ByVpnCore/g' 2>/dev/null \
-  || find "${LIB_DEST}" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0 \
-       | xargs -0 sed -i 's/NymVPNLib/ByVpnCore/g'
+# Normalize module + UniFFI type names for store differentiation (app expects ByVpn*).
+# Order: NymVPNLib before NymVpn (prefix overlap).
+normalize_byvpn_uniffi_names() {
+  local root="$1"
+  local from_mod="$2"
+  local to_mod="$3"
+  find "${root}" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0 \
+    | xargs -0 sed -i '' \
+      -e "s/${from_mod}/${to_mod}/g" \
+      -e 's/NymVpn/ByVpn/g' \
+      -e 's/NymGateway/ByVpnGateway/g' \
+      -e 's/NymDeeplink/ByVpnDeeplink/g' \
+      2>/dev/null \
+    || find "${root}" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0 \
+         | xargs -0 sed -i \
+           -e "s/${from_mod}/${to_mod}/g" \
+           -e 's/NymVpn/ByVpn/g' \
+           -e 's/NymGateway/ByVpnGateway/g' \
+           -e 's/NymDeeplink/ByVpnDeeplink/g'
+}
+normalize_byvpn_uniffi_names "${LIB_DEST}" "NymVPNLib" "ByVpnCore"
 # Rename xcframework directory if needed
 if [[ -d "${LIB_DEST}/NymVPNLibUniffi.xcframework" && ! -d "${LIB_DEST}/ByVpnCoreUniffi.xcframework" ]]; then
   mv "${LIB_DEST}/NymVPNLibUniffi.xcframework" "${LIB_DEST}/ByVpnCoreUniffi.xcframework"
@@ -129,11 +145,24 @@ RPC_DEST="${APPLE_ROOT}/ByVpnRpc"
 rm -rf "${RPC_DEST}"
 cp -R "${RPC_SRC}" "${RPC_DEST}"
 find "${RPC_DEST}" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0 \
-  | xargs -0 sed -i '' 's/NymVPNRpc/ByVpnRpc/g' 2>/dev/null \
+  | xargs -0 sed -i '' \
+    -e 's/NymVPNRpc/ByVpnRpc/g' \
+    -e 's/NymVpn/ByVpn/g' \
+    -e 's/NymGateway/ByVpnGateway/g' \
+    -e 's/NymDeeplink/ByVpnDeeplink/g' \
+    2>/dev/null \
   || find "${RPC_DEST}" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0 \
-       | xargs -0 sed -i 's/NymVPNRpc/ByVpnRpc/g'
+       | xargs -0 sed -i \
+         -e 's/NymVPNRpc/ByVpnRpc/g' \
+         -e 's/NymVpn/ByVpn/g' \
+         -e 's/NymGateway/ByVpnGateway/g' \
+         -e 's/NymDeeplink/ByVpnDeeplink/g'
 if [[ -d "${RPC_DEST}/NymVPNRpcUniffi.xcframework" && ! -d "${RPC_DEST}/ByVpnRpcUniffi.xcframework" ]]; then
   mv "${RPC_DEST}/NymVPNRpcUniffi.xcframework" "${RPC_DEST}/ByVpnRpcUniffi.xcframework"
+fi
+if [[ -d "${RPC_DEST}/Sources/NymVPNRpc" ]]; then
+  rm -rf "${RPC_DEST}/Sources/ByVpnRpc"
+  mv "${RPC_DEST}/Sources/NymVPNRpc" "${RPC_DEST}/Sources/ByVpnRpc"
 fi
 echo "[BuildCore] Copied/normalized ByVpnRpc → ${RPC_DEST}"
 

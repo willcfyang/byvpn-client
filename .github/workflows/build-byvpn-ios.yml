@@ -86,7 +86,7 @@ jobs:
       - name: Build UniFFI core
         if: ${{ inputs.core_source == 'build' }}
         working-directory: nym-vpn-apple/Scripts
-        run: ./BuildCore.sh --debug
+        run: bash BuildCore.sh --debug
 
       - name: Fetch UniFFI core
         if: ${{ inputs.core_source == 'fetch' }}
@@ -99,7 +99,7 @@ jobs:
           if [[ -z "${BYVPN_CORE_BASE_URL:-}" ]]; then
             unset BYVPN_CORE_BASE_URL
           fi
-          ./FetchIOSCore.sh
+          bash FetchIOSCore.sh
 
       - name: Resolve Swift packages
         run: |

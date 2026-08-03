@@ -121,7 +121,8 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_VERSION }}
-          targets: aarch64-apple-ios aarch64-apple-ios-sim
+          # Device + simulator (cargo-swift --platforms ios without --target).
+          targets: aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 
       - name: Install cargo-swift + protoc
         if: ${{ inputs.core_source == 'build' }}

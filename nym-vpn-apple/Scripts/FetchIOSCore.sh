@@ -124,13 +124,11 @@ normalize_and_copy_core() {
     return 1
   fi
 
-  # Rewrite module / UniFFI type names (app expects ByVpn*)
+  # Rewrite module + NymVpn* → ByVpn*; keep NymGateway*/NymDeeplink*/NymEnvironment
   find "$src" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0 \
     | xargs -0 sed -i \
       -e 's/NymVPNLib/ByVpnCore/g' \
       -e 's/NymVpn/ByVpn/g' \
-      -e 's/NymGateway/ByVpnGateway/g' \
-      -e 's/NymDeeplink/ByVpnDeeplink/g' \
       2>/dev/null || true
 
   if [[ -f "$src/Package.swift" ]]; then

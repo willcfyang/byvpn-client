@@ -71,8 +71,10 @@ fi
 LIB_DEST="${APPLE_ROOT}/ByVpnCore"
 rm -rf "${LIB_DEST}"
 cp -R "${LIB_SRC}" "${LIB_DEST}"
-# Normalize module + UniFFI type names for store differentiation (app expects ByVpn*).
-# Order: NymVPNLib before NymVpn (prefix overlap).
+# Normalize module + UniFFI type names for store differentiation.
+# Only rename NymVpn* → ByVpn* (NymVpnService, NymVpnSubscription, …).
+# Keep NymGateway*, NymDeeplink*, NymEnvironment, NymOfflineMonitor — app still uses those.
+# Order: module name (NymVPNLib) before NymVpn (prefix overlap).
 normalize_byvpn_uniffi_names() {
   local root="$1"
   local from_mod="$2"
@@ -81,15 +83,11 @@ normalize_byvpn_uniffi_names() {
     | xargs -0 sed -i '' \
       -e "s/${from_mod}/${to_mod}/g" \
       -e 's/NymVpn/ByVpn/g' \
-      -e 's/NymGateway/ByVpnGateway/g' \
-      -e 's/NymDeeplink/ByVpnDeeplink/g' \
       2>/dev/null \
     || find "${root}" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0 \
          | xargs -0 sed -i \
            -e "s/${from_mod}/${to_mod}/g" \
-           -e 's/NymVpn/ByVpn/g' \
-           -e 's/NymGateway/ByVpnGateway/g' \
-           -e 's/NymDeeplink/ByVpnDeeplink/g'
+           -e 's/NymVpn/ByVpn/g'
 }
 normalize_byvpn_uniffi_names "${LIB_DEST}" "NymVPNLib" "ByVpnCore"
 # Rename xcframework directory if needed
@@ -148,15 +146,11 @@ find "${RPC_DEST}" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name 
   | xargs -0 sed -i '' \
     -e 's/NymVPNRpc/ByVpnRpc/g' \
     -e 's/NymVpn/ByVpn/g' \
-    -e 's/NymGateway/ByVpnGateway/g' \
-    -e 's/NymDeeplink/ByVpnDeeplink/g' \
     2>/dev/null \
   || find "${RPC_DEST}" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0 \
        | xargs -0 sed -i \
          -e 's/NymVPNRpc/ByVpnRpc/g' \
-         -e 's/NymVpn/ByVpn/g' \
-         -e 's/NymGateway/ByVpnGateway/g' \
-         -e 's/NymDeeplink/ByVpnDeeplink/g'
+         -e 's/NymVpn/ByVpn/g'
 if [[ -d "${RPC_DEST}/NymVPNRpcUniffi.xcframework" && ! -d "${RPC_DEST}/ByVpnRpcUniffi.xcframework" ]]; then
   mv "${RPC_DEST}/NymVPNRpcUniffi.xcframework" "${RPC_DEST}/ByVpnRpcUniffi.xcframework"
 fi

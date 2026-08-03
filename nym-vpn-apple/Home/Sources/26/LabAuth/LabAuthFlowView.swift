@@ -73,12 +73,12 @@ private struct LabWelcomePanel: View {
             Spacer(minLength: ByVpnSpacing.large)
             VStack(spacing: AuthLayout.stackSpacing) {
                 Text("Welcome to ByVPN Lab")
-                    .nymTextStyle(.titleScreen)
-                    .foregroundStyle(Color.Nym.textPrimary)
+                    .byVpnTextStyle(.titleScreen)
+                    .foregroundStyle(Color.ByVpn.textPrimary)
                     .multilineTextAlignment(.center)
                 Text("Create a username and password for the ByVPN lab. No 24-word passphrase.")
-                    .nymTextStyle(.bodyDefault)
-                    .foregroundStyle(Color.Nym.textSecondary)
+                    .byVpnTextStyle(.bodyDefault)
+                    .foregroundStyle(Color.ByVpn.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, ByVpnSpacing.component)
                 VStack(spacing: ByVpnSpacing.component) {
@@ -113,7 +113,7 @@ private struct LabCredentialForm: View {
             HStack {
                 Button(action: onBackTapped) {
                     Image(systemName: "chevron.left")
-                        .foregroundStyle(Color.Nym.textPrimary)
+                        .foregroundStyle(Color.ByVpn.textPrimary)
                 }
                 Spacer()
                 GenericImage(imageName: "logoText")
@@ -123,8 +123,8 @@ private struct LabCredentialForm: View {
             }
 
             Text(title)
-                .nymTextStyle(.titleScreen)
-                .foregroundStyle(Color.Nym.textPrimary)
+                .byVpnTextStyle(.titleScreen)
+                .foregroundStyle(Color.ByVpn.textPrimary)
 
             VStack(spacing: ByVpnSpacing.component) {
                 labField(title: "Username", text: $viewModel.username, isSecure: false)
@@ -136,8 +136,8 @@ private struct LabCredentialForm: View {
 
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
-                    .nymTextStyle(.bodySmall)
-                    .foregroundStyle(Color.Nym.error)
+                    .byVpnTextStyle(.bodySmall)
+                    .foregroundStyle(Color.ByVpn.error)
                     .multilineTextAlignment(.center)
             }
 
@@ -158,8 +158,8 @@ private struct LabCredentialForm: View {
     func labField(title: String, text: Binding<String>, isSecure: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .nymTextStyle(.bodySmall)
-                .foregroundStyle(Color.Nym.textSecondary)
+                .byVpnTextStyle(.bodySmall)
+                .foregroundStyle(Color.ByVpn.textSecondary)
             Group {
                 if isSecure {
                     SecureField(title, text: text)
@@ -172,9 +172,9 @@ private struct LabCredentialForm: View {
                 }
             }
             .padding(12)
-            .background(Color.Nym.backgroundElevated)
+            .background(Color.ByVpn.backgroundElevated)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .foregroundStyle(Color.Nym.textPrimary)
+            .foregroundStyle(Color.ByVpn.textPrimary)
         }
     }
 }

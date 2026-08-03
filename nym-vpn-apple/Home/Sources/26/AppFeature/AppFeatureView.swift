@@ -72,7 +72,7 @@ public struct AppFeatureView: View {
             .toolbar(.hidden, for: .navigationBar)
 #endif
         }
-        .nymSnackbar(manager: viewModel.snackbarManager)
+        .byVpnSnackbar(manager: viewModel.snackbarManager)
         .preferredColorScheme(appearance.colorScheme)
         .onAppear { wireOneClickNavigation() }
         .onChange(of: isCredentialImported) { _, newValue in

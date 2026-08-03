@@ -75,3 +75,16 @@ Private repos have limited free Actions minutes; **macOS minutes cost more** tha
 ## Local Mac (alternative to Actions)
 
 See `nym-vpn-apple/STORE_CHECKLIST.md`. Same bundle IDs; build with Xcode Archive after `Scripts/BuildCore.sh --debug` or `FetchIOSCore.sh`.
+
+## Core mirror (vpn.sf)
+
+Secret `BYVPN_CORE_BASE_URL` → `http://104.250.122.199/core/nym-vpn-core`
+
+Layout matches `FetchIOSCore.sh`:
+
+```
+/core/nym-vpn-core/develop/<YYYYMMDDHHMM>/nym-vpn-core-v*-dev.<ts>_ios_universal.zip
+```
+
+Current seed: Nym `nym-vpn-core-v1.16.0` iOS universal (renamed for develop pattern). Replace with a newer ByVPN-built core when available.
+

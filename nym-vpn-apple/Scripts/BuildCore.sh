@@ -3,15 +3,21 @@ set -euo pipefail
 
 # Parse flags
 RELEASE="true"
+IOS_ONLY="false"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --debug)
       RELEASE="false"
       shift
       ;;
+    --ios-only)
+      # Skip macOS.mk / ByVpnRpc rebuild / ByVPND binaries (iOS CI / simulator smoke).
+      IOS_ONLY="true"
+      shift
+      ;;
     *)
       echo "[BuildCore] Unknown option: $1"
-      echo "Usage: $0 [--debug]"
+      echo "Usage: $0 [--debug] [--ios-only]"
       exit 1
       ;;
   esac
@@ -22,6 +28,9 @@ if [[ "${RELEASE}" == "true" ]]; then
   echo "[BuildCore] For a debug build, run: $0 --debug"
 else
   echo "[BuildCore] 🛠  Debug build"
+fi
+if [[ "${IOS_ONLY}" == "true" ]]; then
+  echo "[BuildCore] iOS-only: skip macOS.mk / ByVpnRpc / ByVPND"
 fi
 
 # Resolve paths relative to this script
@@ -74,8 +83,12 @@ fi
 echo "[BuildCore] Copied/normalized ByVpnCore → ${LIB_DEST}"
 
 # 2b) Flatten xcframework headers for Xcode 26+ explicit module builds
-XCODE_VER="$(xcodebuild -version 2>/dev/null | head -1 | awk '{print $2}')"
-if [[ "$(printf '%s\n' "26.4" "${XCODE_VER}" | sort -V | head -1)" == "26.4" ]]; then
+# Avoid pipefail+head SIGPIPE from `sort | head` under set -euo pipefail.
+XCODE_VER="$(xcodebuild -version 2>/dev/null | awk 'NR==1 { print $2; exit }')"
+XCODE_MAJOR="${XCODE_VER%%.*}"
+XCODE_MINOR="${XCODE_VER#*.}"
+XCODE_MINOR="${XCODE_MINOR%%.*}"
+if [[ "${XCODE_MAJOR:-0}" -gt 26 || ( "${XCODE_MAJOR:-0}" -eq 26 && "${XCODE_MINOR:-0}" -ge 4 ) ]]; then
   for HEADERS_DIR in "${LIB_DEST}"/ByVpnCoreUniffi.xcframework/*/Headers "${LIB_DEST}"/NymVPNLibUniffi.xcframework/*/Headers; do
     [[ -d "${HEADERS_DIR}" ]] || continue
     for SUBDIR in "${HEADERS_DIR}"/*/; do
@@ -85,7 +98,12 @@ if [[ "$(printf '%s\n' "26.4" "${XCODE_VER}" | sort -V | head -1)" == "26.4" ]];
   done
   echo "[BuildCore] Flattened ByVpnCore xcframework headers (Xcode ${XCODE_VER})"
 else
-  echo "[BuildCore] Skipping header flatten (Xcode ${XCODE_VER} < 26.4)"
+  echo "[BuildCore] Skipping header flatten (Xcode ${XCODE_VER:-unknown} < 26.4)"
+fi
+
+if [[ "${IOS_ONLY}" == "true" ]]; then
+  echo "[BuildCore] ✅ Finished (iOS-only; kept existing ByVpnRpc placeholder if present)."
+  exit 0
 fi
 
 # 3) Build macOS (produces upload/mac/nym-vpnd if macOS.mk has vpnd targets)
@@ -114,7 +132,7 @@ fi
 echo "[BuildCore] Copied/normalized ByVpnRpc → ${RPC_DEST}"
 
 # 4b) Flatten xcframework headers for Xcode 26+ explicit module builds
-if [[ "$(printf '%s\n' "26.4" "${XCODE_VER}" | sort -V | head -1)" == "26.4" ]]; then
+if [[ "${XCODE_MAJOR:-0}" -gt 26 || ( "${XCODE_MAJOR:-0}" -eq 26 && "${XCODE_MINOR:-0}" -ge 4 ) ]]; then
   for HEADERS_DIR in "${RPC_DEST}"/ByVpnRpcUniffi.xcframework/*/Headers "${RPC_DEST}"/NymVPNRpcUniffi.xcframework/*/Headers; do
     [[ -d "${HEADERS_DIR}" ]] || continue
     for SUBDIR in "${HEADERS_DIR}"/*/; do
@@ -124,7 +142,7 @@ if [[ "$(printf '%s\n' "26.4" "${XCODE_VER}" | sort -V | head -1)" == "26.4" ]];
   done
   echo "[BuildCore] Flattened ByVpnRpc xcframework headers (Xcode ${XCODE_VER})"
 else
-  echo "[BuildCore] Skipping header flatten (Xcode ${XCODE_VER} < 26.4)"
+  echo "[BuildCore] Skipping header flatten (Xcode ${XCODE_VER:-unknown} < 26.4)"
 fi
 
 # 5) Copy binaries to apple Daemon folder

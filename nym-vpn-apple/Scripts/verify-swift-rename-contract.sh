@@ -47,13 +47,18 @@ else
 fi
 
 # --- 1) Leftover UI types (definitions live under ByVpn*) ---
+# Exclude Scripts/ so this checker's own messages do not self-match.
 UI_LEFTOVER='Nym(Spacing|Button|Color|TextStyle|Font|Snackbar|Divider|BackButton|TunnelManager)'
-hits="$(search_hits "${UI_LEFTOVER}" .)"
+if command -v rg >/dev/null 2>&1; then
+  hits="$(rg -n --glob '*.swift' "${UI_LEFTOVER}" . 2>/dev/null || true)"
+else
+  hits="$(grep -REn --include='*.swift' -E "${UI_LEFTOVER}" . 2>/dev/null || true)"
+fi
 if [[ -n "$hits" ]]; then
-  bad "leftover Nym* UI symbols (use ByVpn*)"
+  bad "leftover Nym* UI symbols (rename to ByVpn*)"
   echo "$hits" | head -30
 else
-  ok "no leftover NymSpacing/NymButton/…"
+  ok "no leftover Nym* UI symbols in Swift"
 fi
 
 # --- 2) UniFFI keepers: app still uses these; sed must NOT rename them ---

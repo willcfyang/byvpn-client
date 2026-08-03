@@ -82,6 +82,12 @@ if [[ -d "${LIB_DEST}/NymVPNLibUniffi.xcframework" && ! -d "${LIB_DEST}/ByVpnCor
 fi
 echo "[BuildCore] Copied/normalized ByVpnCore → ${LIB_DEST}"
 
+# iOS CI: stop before xcodebuild/header-flatten (observed SIGABRT exit 134 on runners).
+if [[ "${IOS_ONLY}" == "true" ]]; then
+  echo "[BuildCore] ✅ Finished (iOS-only; kept existing ByVpnRpc placeholder if present)."
+  exit 0
+fi
+
 # 2b) Flatten xcframework headers for Xcode 26+ explicit module builds
 # Avoid pipefail+head SIGPIPE from `sort | head` under set -euo pipefail.
 XCODE_VER="$(xcodebuild -version 2>/dev/null | awk 'NR==1 { print $2; exit }')"
@@ -99,11 +105,6 @@ if [[ "${XCODE_MAJOR:-0}" -gt 26 || ( "${XCODE_MAJOR:-0}" -eq 26 && "${XCODE_MIN
   echo "[BuildCore] Flattened ByVpnCore xcframework headers (Xcode ${XCODE_VER})"
 else
   echo "[BuildCore] Skipping header flatten (Xcode ${XCODE_VER:-unknown} < 26.4)"
-fi
-
-if [[ "${IOS_ONLY}" == "true" ]]; then
-  echo "[BuildCore] ✅ Finished (iOS-only; kept existing ByVpnRpc placeholder if present)."
-  exit 0
 fi
 
 # 3) Build macOS (produces upload/mac/nym-vpnd if macOS.mk has vpnd targets)

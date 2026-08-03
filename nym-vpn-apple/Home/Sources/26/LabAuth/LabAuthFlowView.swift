@@ -70,7 +70,7 @@ private struct LabWelcomePanel: View {
         VStack(spacing: 0) {
             GenericImage(imageName: "logoText")
                 .frame(width: 100, height: 27)
-            Spacer(minLength: NymSpacing.large)
+            Spacer(minLength: ByVpnSpacing.large)
             VStack(spacing: AuthLayout.stackSpacing) {
                 Text("Welcome to ByVPN Lab")
                     .nymTextStyle(.titleScreen)
@@ -80,21 +80,21 @@ private struct LabWelcomePanel: View {
                     .nymTextStyle(.bodyDefault)
                     .foregroundStyle(Color.Nym.textSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, NymSpacing.component)
-                VStack(spacing: NymSpacing.component) {
-                    NymButton("Register", style: .primary) {
+                    .padding(.horizontal, ByVpnSpacing.component)
+                VStack(spacing: ByVpnSpacing.component) {
+                    ByVpnButton("Register", style: .primary) {
                         ImpactGenerator.shared.softImpact()
                         onRegisterTapped()
                     }
-                    NymButton("Sign in", style: .primary) {
+                    ByVpnButton("Sign in", style: .primary) {
                         ImpactGenerator.shared.softImpact()
                         onLoginTapped()
                     }
                 }
             }
-            Spacer(minLength: NymSpacing.large)
+            Spacer(minLength: ByVpnSpacing.large)
         }
-        .padding(.horizontal, NymSpacing.component)
+        .padding(.horizontal, ByVpnSpacing.component)
         .padding(.vertical, AuthLayout.verticalPadding)
         .frame(maxWidth: .infinity)
     }
@@ -126,7 +126,7 @@ private struct LabCredentialForm: View {
                 .nymTextStyle(.titleScreen)
                 .foregroundStyle(Color.Nym.textPrimary)
 
-            VStack(spacing: NymSpacing.component) {
+            VStack(spacing: ByVpnSpacing.component) {
                 labField(title: "Username", text: $viewModel.username, isSecure: false)
                 labField(title: "Password", text: $viewModel.password, isSecure: true)
                 if showConfirmPassword {
@@ -141,7 +141,7 @@ private struct LabCredentialForm: View {
                     .multilineTextAlignment(.center)
             }
 
-            NymButton(
+            ByVpnButton(
                 viewModel.submissionState == .loading ? "…" : submitLabel,
                 style: .primary,
                 isDisabled: viewModel.submissionState == .loading
@@ -150,7 +150,7 @@ private struct LabCredentialForm: View {
                 onSubmit()
             }
         }
-        .padding(.horizontal, NymSpacing.component)
+        .padding(.horizontal, ByVpnSpacing.component)
         .padding(.vertical, AuthLayout.verticalPadding)
         .frame(maxWidth: .infinity)
     }

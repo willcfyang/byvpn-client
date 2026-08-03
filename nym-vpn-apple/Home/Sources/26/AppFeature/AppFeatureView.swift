@@ -218,7 +218,7 @@ private extension AppFeatureView {
                 impactGenerator.softImpact()
                 viewModel.leadingButtonTapped()
             }
-            .padding(.leading, NymSpacing.small)
+            .padding(.leading, ByVpnSpacing.small)
             Spacer()
             ImageButton(
                 systemImageName: "gear",
@@ -228,11 +228,11 @@ private extension AppFeatureView {
                 impactGenerator.softImpact()
                 viewModel.path.append(HomeLink.settings)
             }
-            .padding(.leading, NymSpacing.small)
+            .padding(.leading, ByVpnSpacing.small)
         }
         .frame(height: Constants.NavigationBar.height)
-        .padding(.horizontal, NymSpacing.component)
-        .padding(.vertical, NymSpacing.small)
+        .padding(.horizontal, ByVpnSpacing.component)
+        .padding(.vertical, ByVpnSpacing.small)
         .overlay {
             if viewModel.shouldShowLogo {
                 GenericImage(imageName: "logoText")
@@ -325,7 +325,7 @@ private extension AppFeatureView {
     enum Constants {
         enum NavigationBar {
             static let height: CGFloat = 64
-            static let totalHeight: CGFloat = height + NymSpacing.small * 2
+            static let totalHeight: CGFloat = height + ByVpnSpacing.small * 2
 
             enum LeadingIcon {
                 static let size: CGFloat = 24

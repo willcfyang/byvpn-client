@@ -44,6 +44,23 @@ jobs:
         with:
           fetch-depth: 1
 
+      # NTFS/rsync imports often lose +x; never rely on mode alone for make/scripts.
+      - name: Ensure scripts are executable
+        working-directory: .
+        run: |
+          set -euo pipefail
+          find . -type f \( -name '*.sh' -o -name '*.bash' \) -print0 | xargs -0 chmod +x
+          # common make-invoked helpers
+          for f in \
+            wireguard/build-wireguard-go.sh \
+            nym-vpn-apple/Scripts/BuildCore.sh \
+            nym-vpn-apple/Scripts/FetchIOSCore.sh \
+            scripts/*.sh \
+            nym-vpn-core/scripts/*.sh; do
+            [[ -f "$f" ]] && chmod +x "$f" || true
+          done
+          ls -l wireguard/build-wireguard-go.sh nym-vpn-apple/Scripts/*.sh | head -40
+
       - name: Select Xcode
         run: |
           set -euo pipefail

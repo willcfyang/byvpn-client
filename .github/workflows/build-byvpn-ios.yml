@@ -1,0 +1,218 @@
+name: build-byvpn-ios
+
+# Hosted macOS runner for ByVPN (com.byvpn.app). Manual only — avoid burning minutes on every push.
+# Installable device/TestFlight builds still need Apple Developer Program + signing secrets (see IOS_CI.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      core_source:
+        description: |
+          UniFFI core:
+          fetch — download prebuilt iOS core (faster)
+          build — compile Rust core on the runner (slow, costly)
+        type: choice
+        options:
+          - fetch
+          - build
+        default: fetch
+      signed:
+        description: "Archive/sign for device (requires Apple secrets). Off = simulator smoke build."
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.95"
+  GOLANG_VERSION: "1.24.4"
+
+concurrency:
+  group: build-byvpn-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: nym-vpn-apple
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          # Prefer a recent stable Xcode on the image; fall back to default.
+          for cand in \
+            /Applications/Xcode_16.4.app \
+            /Applications/Xcode_16.3.app \
+            /Applications/Xcode_16.2.app \
+            /Applications/Xcode.app; do
+            if [[ -d "$cand" ]]; then
+              sudo xcode-select -s "$cand"
+              break
+            fi
+          done
+          xcodebuild -version
+          swift --version
+
+      - name: Install Go (wireguard-go / core build)
+        if: ${{ inputs.core_source == 'build' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          cache-dependency-path: wireguard/libwg/go.sum
+
+      - name: Install Rust
+        if: ${{ inputs.core_source == 'build' }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-apple-ios aarch64-apple-ios-sim
+
+      - name: Install cargo-swift + protoc
+        if: ${{ inputs.core_source == 'build' }}
+        run: |
+          set -euo pipefail
+          cargo install cargo-swift --locked --version 0.11.0 || cargo install cargo-swift --version 0.11.0
+          brew install protobuf || true
+          protoc --version
+
+      - name: Build UniFFI core
+        if: ${{ inputs.core_source == 'build' }}
+        working-directory: nym-vpn-apple/Scripts
+        run: ./BuildCore.sh --debug
+
+      - name: Fetch UniFFI core
+        if: ${{ inputs.core_source == 'fetch' }}
+        working-directory: nym-vpn-apple/Scripts
+        env:
+          BYVPN_CORE_BASE_URL: ${{ secrets.BYVPN_CORE_BASE_URL }}
+        run: |
+          set -euo pipefail
+          # Empty secret → script default (upstream CI mirror). Prefer private mirror via repo secret.
+          if [[ -z "${BYVPN_CORE_BASE_URL:-}" ]]; then
+            unset BYVPN_CORE_BASE_URL
+          fi
+          ./FetchIOSCore.sh
+
+      - name: Resolve Swift packages
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -workspace ByVPN.xcworkspace \
+            -scheme ByVPN
+
+      - name: Simulator smoke build (unsigned)
+        if: ${{ inputs.signed != true }}
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          xcodebuild \
+            -workspace ByVPN.xcworkspace \
+            -scheme ByVPN \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Require Apple secrets for signed archive
+        if: ${{ inputs.signed == true }}
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          BUILD_CERTIFICATE_PASSWORD: ${{ secrets.BUILD_CERTIFICATE_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          BUILD_PROVISION_PROFILE_TUNNEL_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_TUNNEL_BASE64 }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for v in APPLE_TEAM_ID BUILD_CERTIFICATE_BASE64 BUILD_CERTIFICATE_PASSWORD \
+                   BUILD_PROVISION_PROFILE_BASE64 BUILD_PROVISION_PROFILE_TUNNEL_BASE64; do
+            if [[ -z "${!v:-}" ]]; then
+              echo "Missing secret: $v"
+              missing=1
+            fi
+          done
+          if [[ "$missing" -ne 0 ]]; then
+            echo "::error::Signed build requested but Apple secrets are incomplete. See IOS_CI.md"
+            exit 1
+          fi
+          echo "APPLE_TEAM_ID=$APPLE_TEAM_ID" >> "$GITHUB_ENV"
+
+      - name: Import signing material
+        if: ${{ inputs.signed == true }}
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          BUILD_CERTIFICATE_PASSWORD: ${{ secrets.BUILD_CERTIFICATE_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          BUILD_PROVISION_PROFILE_TUNNEL_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_TUNNEL_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/build_certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$BUILD_CERTIFICATE_PASSWORD" -A \
+            -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$RUNNER_TEMP/app.mobileprovision"
+          echo "$BUILD_PROVISION_PROFILE_TUNNEL_BASE64" | base64 --decode > "$RUNNER_TEMP/tunnel.mobileprovision"
+          for p in "$RUNNER_TEMP"/app.mobileprovision "$RUNNER_TEMP"/tunnel.mobileprovision; do
+            uuid=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "$p")")
+            cp "$p" "$HOME/Library/MobileDevice/Provisioning Profiles/${uuid}.mobileprovision"
+            echo "Installed profile $uuid from $(basename "$p")"
+          done
+
+      - name: Archive iOS (signed)
+        if: ${{ inputs.signed == true }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/export"
+          xcodebuild archive \
+            -workspace ByVPN.xcworkspace \
+            -scheme ByVPN \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/ByVPN.xcarchive" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual
+
+          # Export options — ad-hoc for lab device install; swap to app-store when ready for TestFlight.
+          EXPORT_PLIST="$RUNNER_TEMP/ExportOptions.plist"
+          printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+            '<plist version="1.0"><dict>' \
+            '<key>method</key><string>ad-hoc</string>' \
+            "<key>teamID</key><string>${APPLE_TEAM_ID}</string>" \
+            '<key>signingStyle</key><string>manual</string>' \
+            '<key>compileBitcode</key><false/>' \
+            '</dict></plist>' > "$EXPORT_PLIST"
+
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/ByVPN.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$EXPORT_PLIST"
+
+      - name: Upload IPA
+        if: ${{ inputs.signed == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ByVPN-ios-adhoc
+          path: ${{ runner.temp }}/export/*.ipa
+          if-no-files-found: error
+          retention-days: 14

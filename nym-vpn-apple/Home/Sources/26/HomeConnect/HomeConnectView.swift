@@ -168,10 +168,10 @@ private extension HomeConnectView {
     }
 
     var dottedMapBackground: some View {
-        Image("byvpnGlobe", bundle: .main)
+        Image(systemName: "globe.americas.fill")
             .resizable()
             .scaledToFit()
-            .opacity(0.12)
+            .foregroundStyle(Color.ByVpn.primary.opacity(0.08))
             .padding(40)
             .allowsHitTesting(false)
     }

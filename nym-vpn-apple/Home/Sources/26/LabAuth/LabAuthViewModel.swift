@@ -82,9 +82,11 @@ final class LabAuthViewModel {
                     )
                     onRegistered?()
                 case .login:
+                    // Android LabAuth parity: store mnemonic only — do not call
+                    // registerAccount() (that path expects a purchase/token and
+                    // surfaces "Account not registered" on lab mock).
                     let mnemonic = try await LabAuthClient.login(username: user, password: password)
                     try await credentialsManager.add(credential: mnemonic)
-                    try await credentialsManager.registerAccount()
                     applyLabDNS()
                     password = ""
                     confirmPassword = ""
@@ -108,7 +110,6 @@ final class LabAuthViewModel {
         if let lab = error as? LabAuthClient.LabAuthError {
             switch lab {
             case .unauthorized:
-                // Lab API never distinguishes missing user vs bad password.
                 return "byvpn.auth.error.invalidCredentials".localizedString
             case .conflict:
                 return "byvpn.auth.error.usernameTaken".localizedString

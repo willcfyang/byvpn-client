@@ -13,20 +13,12 @@ public struct LaunchView: View {
     public var body: some View {
         ZStack {
             Color.ByVpn.background.ignoresSafeArea()
-            Image("byvpnGlobe", bundle: .main)
-                .resizable()
-                .scaledToFit()
-                .opacity(0.18)
-                .padding(36)
-                .allowsHitTesting(false)
 
             VStack(spacing: ByVpnSpacing.large) {
                 Spacer()
-                Image("byvpnShield", bundle: .main)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 88, height: 88)
-                    .accessibilityHidden(true)
+                Image(systemName: "shield.lefthalf.filled")
+                    .font(.system(size: 64, weight: .regular))
+                    .foregroundStyle(Color.ByVpn.primary)
                 Text("byvpn")
                     .font(.system(size: 36, weight: .bold))
                     .foregroundStyle(Color.ByVpn.textPrimary)

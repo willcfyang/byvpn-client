@@ -3,6 +3,7 @@ import CredentialsManager
 import ImpactGenerator
 import Theme
 import UIComponents
+import UIKit
 
 struct LabAuthFlowView: View {
     enum Step: Equatable {
@@ -33,12 +34,6 @@ struct LabAuthFlowView: View {
     var body: some View {
         ZStack {
             Color.ByVpn.background.ignoresSafeArea()
-            Image("byvpnGlobe", bundle: .main)
-                .resizable()
-                .scaledToFit()
-                .opacity(0.14)
-                .padding(48)
-                .allowsHitTesting(false)
 
             Group {
                 switch step {
@@ -50,7 +45,7 @@ struct LabAuthFlowView: View {
                         title: "byvpn.auth.signup.title".localizedString,
                         submitLabel: "byvpn.auth.signup.submit".localizedString,
                         showConfirmPassword: true,
-                        onBack: { step = .welcome },
+                        onBack: { dismissKeyboardThen { step = .welcome } },
                         onSubmit: {
                             viewModel.submit(mode: .register) {
                                 step = .login
@@ -63,7 +58,7 @@ struct LabAuthFlowView: View {
                         title: "byvpn.auth.login.title".localizedString,
                         submitLabel: "byvpn.auth.login.submit".localizedString,
                         showConfirmPassword: false,
-                        onBack: { step = .welcome },
+                        onBack: { dismissKeyboardThen { step = .welcome } },
                         onSubmit: { viewModel.submit(mode: .login) }
                     )
                     .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -77,7 +72,9 @@ struct LabAuthFlowView: View {
             isConfirmPasswordVisible = false
             switch newValue {
             case .login, .register:
-                focusedField = .username
+                DispatchQueue.main.async {
+                    focusedField = .username
+                }
             case .welcome:
                 focusedField = nil
             }
@@ -89,11 +86,9 @@ private extension LabAuthFlowView {
     private var welcomePanel: some View {
         VStack(spacing: ByVpnSpacing.large) {
             Spacer()
-            Image("byvpnShield", bundle: .main)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 72, height: 72)
-                .accessibilityHidden(true)
+            Image(systemName: "shield.lefthalf.filled")
+                .font(.system(size: 56, weight: .regular))
+                .foregroundStyle(Color.ByVpn.primary)
             Text("byvpn")
                 .font(.system(size: 32, weight: .bold))
                 .foregroundStyle(Color.ByVpn.textPrimary)
@@ -128,155 +123,168 @@ private extension LabAuthFlowView {
         onBack: @escaping () -> Void,
         onSubmit: @escaping () -> Void
     ) -> some View {
-        VStack(spacing: ByVpnSpacing.component) {
-            HStack {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.ByVpn.textPrimary)
-                        .frame(width: 44, height: 44)
-                }
-                Spacer()
-                Text("byvpn")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.ByVpn.primary)
-                Spacer()
-                Color.clear.frame(width: 44, height: 44)
-            }
-            .padding(.top, ByVpnSpacing.small)
-
-            Text(title)
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(Color.ByVpn.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
+        ScrollView {
             VStack(spacing: ByVpnSpacing.component) {
-                usernameField
-                passwordField(
-                    title: "byvpn.auth.password".localizedString,
-                    text: $viewModel.password,
-                    field: .password,
-                    isVisible: $isPasswordVisible,
-                    submitLabel: showConfirmPassword ? .next : .go,
-                    onSubmit: {
-                        if showConfirmPassword {
-                            focusedField = .confirmPassword
-                        } else {
-                            focusedField = nil
-                            onSubmit()
+                HStack {
+                    Button(action: onBack) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.ByVpn.textPrimary)
+                            .frame(width: 44, height: 44)
+                    }
+                    Spacer()
+                    Text("byvpn")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.ByVpn.primary)
+                    Spacer()
+                    Color.clear.frame(width: 44, height: 44)
+                }
+                .padding(.top, ByVpnSpacing.small)
+
+                Text(title)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(Color.ByVpn.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(spacing: ByVpnSpacing.component) {
+                    labeledField(title: "byvpn.auth.username".localizedString) {
+                        TextField("byvpn.auth.username".localizedString, text: $viewModel.username)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .textContentType(.username)
+                            .keyboardType(.asciiCapable)
+                            .submitLabel(.next)
+                            .focused($focusedField, equals: .username)
+                            .onSubmit {
+                                DispatchQueue.main.async {
+                                    focusedField = .password
+                                }
+                            }
+                    }
+
+                    labeledField(title: "byvpn.auth.password".localizedString) {
+                        passwordInput(
+                            text: $viewModel.password,
+                            field: .password,
+                            isVisible: $isPasswordVisible,
+                            submitLabel: showConfirmPassword ? .next : .go,
+                            onSubmit: {
+                                if showConfirmPassword {
+                                    DispatchQueue.main.async {
+                                        focusedField = .confirmPassword
+                                    }
+                                } else {
+                                    focusedField = nil
+                                    onSubmit()
+                                }
+                            }
+                        )
+                    }
+
+                    if showConfirmPassword {
+                        labeledField(title: "byvpn.auth.confirmPassword".localizedString) {
+                            passwordInput(
+                                text: $viewModel.confirmPassword,
+                                field: .confirmPassword,
+                                isVisible: $isConfirmPasswordVisible,
+                                submitLabel: .go,
+                                onSubmit: {
+                                    focusedField = nil
+                                    onSubmit()
+                                }
+                            )
                         }
                     }
-                )
-                if showConfirmPassword {
-                    passwordField(
-                        title: "byvpn.auth.confirmPassword".localizedString,
-                        text: $viewModel.confirmPassword,
-                        field: .confirmPassword,
-                        isVisible: $isConfirmPasswordVisible,
-                        submitLabel: .go,
-                        onSubmit: {
-                            focusedField = nil
-                            onSubmit()
-                        }
-                    )
                 }
-            }
 
-            if let errorMessage = viewModel.errorMessage {
-                Text(errorMessage)
-                    .byVpnTextStyle(.bodySmall)
-                    .foregroundStyle(Color.ByVpn.error)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                        .byVpnTextStyle(.bodySmall)
+                        .foregroundStyle(Color.ByVpn.error)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
-            Spacer()
+                Spacer(minLength: ByVpnSpacing.section)
 
-            ByVpnButton(
-                viewModel.submissionState == .loading ? "…" : submitLabel,
-                style: .primary,
-                isDisabled: viewModel.submissionState == .loading
-            ) {
-                ImpactGenerator.shared.softImpact()
-                focusedField = nil
-                onSubmit()
+                ByVpnButton(
+                    viewModel.submissionState == .loading ? "…" : submitLabel,
+                    style: .primary,
+                    isDisabled: viewModel.submissionState == .loading
+                ) {
+                    ImpactGenerator.shared.softImpact()
+                    focusedField = nil
+                    onSubmit()
+                }
+                .padding(.bottom, ByVpnSpacing.section)
             }
-            .padding(.bottom, ByVpnSpacing.section)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .scrollIndicators(.hidden)
     }
 
-    private var usernameField: some View {
+    private func labeledField<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("byvpn.auth.username".localizedString)
+            Text(title)
                 .byVpnTextStyle(.bodySmall)
                 .foregroundStyle(Color.ByVpn.textSecondary)
-            TextField("", text: $viewModel.username)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .textContentType(.username)
-                .keyboardType(.asciiCapable)
-                .submitLabel(.next)
-                .focused($focusedField, equals: .username)
-                .onSubmit { focusedField = .password }
+            content()
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
                 .background(fieldBackground)
-                .contentShape(Rectangle())
-                .onTapGesture { focusedField = .username }
         }
     }
 
-    private func passwordField(
-        title: String,
+    private func passwordInput(
         text: Binding<String>,
         field: Field,
         isVisible: Binding<Bool>,
         submitLabel: SubmitLabel,
         onSubmit: @escaping () -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .byVpnTextStyle(.bodySmall)
-                .foregroundStyle(Color.ByVpn.textSecondary)
-            HStack(spacing: 8) {
-                Group {
-                    if isVisible.wrappedValue {
-                        TextField("", text: text)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                    } else {
-                        SecureField("", text: text)
-                    }
+        HStack(spacing: 8) {
+            Group {
+                if isVisible.wrappedValue {
+                    TextField("byvpn.auth.password".localizedString, text: text)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textContentType(.password)
+                        .keyboardType(.asciiCapable)
+                } else {
+                    SecureField("byvpn.auth.password".localizedString, text: text)
+                        .textContentType(.password)
+                        .keyboardType(.asciiCapable)
                 }
-                .textContentType(.password)
-                .submitLabel(submitLabel)
-                .focused($focusedField, equals: field)
-                .onSubmit(onSubmit)
-
-                Button {
-                    ImpactGenerator.shared.softImpact()
-                    isVisible.wrappedValue.toggle()
-                } label: {
-                    Image(systemName: isVisible.wrappedValue ? "eye.slash.fill" : "eye.fill")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Color.ByVpn.textSecondary)
-                        .frame(width: 36, height: 36)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    Text(
-                        isVisible.wrappedValue
-                            ? "byvpn.auth.hidePassword".localizedString
-                            : "byvpn.auth.showPassword".localizedString
-                    )
-                )
             }
-            .padding(.leading, 14)
-            .padding(.trailing, 6)
-            .padding(.vertical, 8)
-            .background(fieldBackground)
-            .contentShape(Rectangle())
-            .onTapGesture { focusedField = field }
+            .submitLabel(submitLabel)
+            .focused($focusedField, equals: field)
+            .onSubmit(onSubmit)
+            .id("\(field)-\(isVisible.wrappedValue)")
+
+            Button {
+                ImpactGenerator.shared.softImpact()
+                isVisible.wrappedValue.toggle()
+                // Keep keyboard on the password field after SecureField ↔ TextField swap.
+                DispatchQueue.main.async {
+                    focusedField = field
+                }
+            } label: {
+                Image(systemName: isVisible.wrappedValue ? "eye.slash.fill" : "eye.fill")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.ByVpn.textSecondary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                Text(
+                    isVisible.wrappedValue
+                        ? "byvpn.auth.hidePassword".localizedString
+                        : "byvpn.auth.showPassword".localizedString
+                )
+            )
         }
     }
 
@@ -287,5 +295,11 @@ private extension LabAuthFlowView {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color.ByVpn.backgroundCard)
             )
+    }
+
+    private func dismissKeyboardThen(_ action: @escaping () -> Void) {
+        focusedField = nil
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        action()
     }
 }

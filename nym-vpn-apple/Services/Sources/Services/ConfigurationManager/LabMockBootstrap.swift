@@ -12,7 +12,8 @@ public enum LabMockBootstrap {
         guard LabMock.isEnabled else { return }
         setenv("NYM_VPN_LAB_SKIP_CONNECTION_PROBE", "1", 1)
         setenv("NYM_VPN_LAB_PROBE_IP", LabMock.defaultProbeIP, 1)
-        logger.info("LabMockEnv skip_probe=1 probe_ip=\(LabMock.defaultProbeIP)")
+        setenv("NYM_VPN_APP_LAB_MOCK", "1", 1)
+        logger.info("LabMockEnv skip_probe=1 lab_mock=1 probe_ip=\(LabMock.defaultProbeIP)")
     }
 
     /// Writes `networks/mainnet/*.json` under the lib config cache dir (iOS).

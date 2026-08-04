@@ -59,11 +59,29 @@ impl NymVpnAccountStorage {
         let storable_account = StorableAccount::try_from(request).map_err(VpnError::internal)?;
         let account = VpnAccount::try_from(storable_account.clone()).map_err(VpnError::internal)?;
 
-        let vpn_api_client = self.create_vpn_api_client().await?;
-        let _response = vpn_api_client
-            .get_account(&account)
-            .await
-            .map_err(|_err| VpnError::AccountNotRegistered)?;
+        // Lab / mock builds: Android LabAuth only stores the mnemonic (storeAccount).
+        // Production iOS login verifies the account exists on the VPN API first; that
+        // check fails against nym-mock-api (no GET /public/v1/account/{id}) and surfaces
+        // as VpnError::AccountNotRegistered even when lab username/password succeeded.
+        let skip_remote_account_check = std::env::var("NYM_VPN_LAB_SKIP_CONNECTION_PROBE")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false)
+            || std::env::var("NYM_VPN_APP_LAB_MOCK")
+                .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false);
+
+        if !skip_remote_account_check {
+            let vpn_api_client = self.create_vpn_api_client().await?;
+            let _response = vpn_api_client
+                .get_account(&account)
+                .await
+                .map_err(|_err| VpnError::AccountNotRegistered)?;
+        } else {
+            tracing::info!(
+                "lab mock: skipping remote get_account before store (account_id={})",
+                account.id()
+            );
+        }
 
         self.storage.store_account(storable_account).await?;
         self.storage.init_keys(None).await?;

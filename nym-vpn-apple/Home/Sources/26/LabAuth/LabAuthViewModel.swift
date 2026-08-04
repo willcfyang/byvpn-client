@@ -4,6 +4,9 @@ import ConfigurationManager
 import ConnectionManager
 import Constants
 import CredentialsManager
+#if os(iOS)
+import ErrorHandler
+#endif
 import SnackbarManager
 import Theme
 
@@ -82,10 +85,9 @@ final class LabAuthViewModel {
                     )
                     onRegistered?()
                 case .login:
-                    // Android LabAuth parity: store mnemonic only — do not call
-                    // registerAccount() (that path expects a purchase/token and
-                    // surfaces "Account not registered" on lab mock).
+                    // 1) Lab username/password → mnemonic (HTTP to mock API)
                     let mnemonic = try await LabAuthClient.login(username: user, password: password)
+                    // 2) Store mnemonic locally (must NOT require remote account registration)
                     try await credentialsManager.add(credential: mnemonic)
                     applyLabDNS()
                     password = ""
@@ -95,8 +97,7 @@ final class LabAuthViewModel {
             } catch is CancellationError {
                 // keep state
             } catch {
-                let message = mapError(error, mode: mode)
-                fail(message)
+                fail(mapError(error, mode: mode))
             }
         }
     }
@@ -113,11 +114,24 @@ final class LabAuthViewModel {
                 return "byvpn.auth.error.invalidCredentials".localizedString
             case .conflict:
                 return "byvpn.auth.error.usernameTaken".localizedString
-            default:
-                return lab.localizedDescription
+            case .server(let message):
+                return "Lab API: \(message)"
+            case .badRequest(let message):
+                return message
+            case .disabled:
+                return "Lab auth disabled"
+            case .invalidResponse:
+                return "Invalid lab auth response"
             }
         }
-        return error.localizedDescription
+#if os(iOS)
+        if let vpn = error as? VPNErrorReason {
+            // "账户未注册" here means VPN-API get_account failed after lab login —
+            // not "username missing from lab auth DB".
+            return "[\(String(describing: vpn))] \(vpn.errorDescription ?? vpn.localizedDescription)"
+        }
+#endif
+        return "\(String(describing: type(of: error))): \(error.localizedDescription)"
     }
 
     private func fail(_ message: String) {

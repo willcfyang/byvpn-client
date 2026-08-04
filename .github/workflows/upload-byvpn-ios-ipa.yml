@@ -1,0 +1,100 @@
+name: upload-byvpn-ios-ipa
+
+# Upload an existing App Store IPA artifact to App Store Connect / TestFlight.
+# Requires APP_STORE_CONNECT_API_{KEY,ISSUER_ID,PRIVATE_KEY} secrets.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "GitHub Actions run id that produced ByVPN-ios-appstore"
+        required: true
+        type: string
+        default: "30876573932"
+      artifact_name:
+        description: "Artifact name containing the .ipa"
+        required: true
+        type: string
+        default: "ByVPN-ios-appstore"
+
+concurrency:
+  group: upload-byvpn-ios-ipa
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Require ASC API secrets
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for v in APP_STORE_CONNECT_API_KEY APP_STORE_CONNECT_API_ISSUER_ID APP_STORE_CONNECT_API_PRIVATE_KEY; do
+            if [[ -z "${!v:-}" ]]; then
+              echo "Missing secret: $v"
+              missing=1
+            fi
+          done
+          [[ "$missing" -eq 0 ]]
+
+      - name: Download IPA artifact from prior run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ipa"
+          cd "$RUNNER_TEMP/ipa"
+          gh run download "${{ inputs.source_run_id }}" \
+            -R "${{ github.repository }}" \
+            -n "${{ inputs.artifact_name }}"
+          IPA=$(find "$RUNNER_TEMP/ipa" -name '*.ipa' | head -1)
+          if [[ -z "$IPA" ]]; then
+            echo "::error::No .ipa found in artifact ${{ inputs.artifact_name }}"
+            find "$RUNNER_TEMP/ipa" -type f -print
+            exit 1
+          fi
+          echo "IPA=$IPA" >> "$GITHUB_ENV"
+          ls -lh "$IPA"
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          set -euo pipefail
+          # altool looks in ~/private_keys and ~/.appstoreconnect/private_keys
+          for d in "$HOME/private_keys" "$HOME/.appstoreconnect/private_keys"; do
+            mkdir -p "$d"
+            printf '%s\n' "$ASC_PRIVATE_KEY" > "$d/AuthKey_${ASC_KEY_ID}.p8"
+            chmod 600 "$d/AuthKey_${ASC_KEY_ID}.p8"
+          done
+
+      - name: Upload IPA to App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          echo "Uploading $IPA …"
+          # Prefer Transporter / altool API-key auth (no Apple ID password).
+          if xcrun altool --upload-app \
+              --type ios \
+              --file "$IPA" \
+              --apiKey "$ASC_KEY_ID" \
+              --apiIssuer "$ASC_ISSUER_ID" \
+              --show-progress; then
+            echo "Upload succeeded via altool"
+            exit 0
+          fi
+
+          echo "altool failed; trying iTMSTransporter…"
+          xcrun iTMSTransporter -m upload \
+            -assetFile "$IPA" \
+            -apiKey "$ASC_KEY_ID" \
+            -apiIssuer "$ASC_ISSUER_ID" \
+            -v informational

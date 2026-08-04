@@ -51,6 +51,8 @@ Optional later (TestFlight / ASC automation):
 | `APP_STORE_CONNECT_API_ISSUER_ID` | Issuer UUID |
 | `APP_STORE_CONNECT_API_PRIVATE_KEY` | `.p8` PEM body |
 
+To upload an already-built IPA without rebuilding: **Actions → upload-byvpn-ios-ipa**, set `source_run_id` to the successful signed build run (e.g. `30876573932`). Requires the three ASC secrets above and an App Store Connect app record for `com.byvpn.app`.
+
 Encode profiles/certs:
 
 ```bash

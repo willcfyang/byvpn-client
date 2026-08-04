@@ -13,9 +13,11 @@ Upstream Nym workflows (self-hosted `AppleSilicon`, Nym bundle IDs) live under `
 |------|--------|
 | App | `com.byvpn.app` |
 | Packet Tunnel | `com.byvpn.app.tunnel` |
-| Widget | `com.byvpn.app.widget` |
+| Widget | `com.byvpn.app.widget` (omitted from signed CI IPA until a profile is provided) |
 | App Group | `group.com.byvpn.app` |
 | Workspace / scheme | `ByVPN.xcworkspace` / `ByVPN` |
+
+Signed CI runs `Scripts/prepare-signed-ios-archive.sh`: Manual signing + `byvpn` / `byvpntunnel` profiles, strips Associated Domains from entitlements (not in the current App Store profile), and drops the widget extension from the archive.
 
 ## How to run
 

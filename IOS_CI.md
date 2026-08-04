@@ -25,7 +25,7 @@ Upstream Nym workflows (self-hosted `AppleSilicon`, Nym bundle IDs) live under `
    - **build**: compile Rust core on the Mac runner (`Scripts/BuildCore.sh --debug --ios-only`) — slower, burns more minutes. Needs repo-root `nym-vpn-patches/` (lab nym path deps); the workflow symlinks it to `../../nym-vpn-patches` relative to `nym-vpn-core`. Skips macOS daemon/RPC rebuild.
 3. `signed`:
    - **false** (default): iOS Simulator smoke build with `CODE_SIGNING_ALLOWED=NO`
-   - **true**: ad-hoc Archive + IPA (needs secrets below)
+   - **true**: App Store Archive + IPA (needs secrets below; for TestFlight / ASC upload)
 
 Optional secret `BYVPN_CORE_BASE_URL` points `FetchIOSCore.sh` at a private core mirror; if unset, the script uses its default upstream CI base URL.
 
@@ -35,11 +35,11 @@ Required when `signed=true`:
 
 | Secret | Contents |
 |--------|----------|
-| `APPLE_TEAM_ID` | 10-char Team ID |
-| `BUILD_CERTIFICATE_BASE64` | Distribution (or Ad Hoc) `.p12`, base64 |
-| `BUILD_CERTIFICATE_PASSWORD` | `.p12` password |
-| `BUILD_PROVISION_PROFILE_BASE64` | App profile for `com.byvpn.app` |
-| `BUILD_PROVISION_PROFILE_TUNNEL_BASE64` | Tunnel profile for `com.byvpn.app.tunnel` |
+| `APPLE_TEAM_ID` | 10-char Team ID (e.g. `NP9LT79QW9`) |
+| `BUILD_CERTIFICATE_BASE64` | Apple Distribution `.p12`, base64 |
+| `BUILD_CERTIFICATE_PASSWORD` | `.p12` password (may be empty) |
+| `BUILD_PROVISION_PROFILE_BASE64` | App Store profile for `com.byvpn.app` |
+| `BUILD_PROVISION_PROFILE_TUNNEL_BASE64` | App Store profile for `com.byvpn.app.tunnel` |
 
 Optional later (TestFlight / ASC automation):
 
@@ -62,9 +62,9 @@ base64 -i cert.p12 | tr -d '\n' > cert.b64
 1. Enroll in **Apple Developer Program** (~$99/yr) — required for Network Extension VPN.
 2. Create App IDs: `com.byvpn.app`, `com.byvpn.app.tunnel` (+ widget if needed).
 3. Enable **Network Extensions** + **App Groups** (`group.com.byvpn.app`) on those IDs.
-4. Create Ad Hoc (lab) or App Store distribution cert + provisioning profiles that include your test devices.
+4. Create **App Store** distribution cert + App Store provisioning profiles for app + tunnel (Ad Hoc only if you need sideload).
 5. Set `DEVELOPMENT_TEAM` in Xcode / secrets (`APPLE_TEAM_ID`).
-6. Add the secrets above, then run workflow with `signed=true`.
+6. Add the secrets above, then run workflow with `signed=true`. IPA is App Store–signed (TestFlight / ASC), not Ad Hoc sideload.
 
 Without Apple materials, use `signed=false` to validate that the project still compiles on a hosted Mac.
 

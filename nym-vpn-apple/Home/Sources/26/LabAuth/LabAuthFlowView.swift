@@ -11,7 +11,7 @@ struct LabAuthFlowView: View {
         case login
     }
 
-    private enum Field: Hashable {
+    enum Field: Hashable {
         case username
         case password
         case confirmPassword
@@ -86,7 +86,7 @@ struct LabAuthFlowView: View {
 }
 
 private extension LabAuthFlowView {
-    var welcomePanel: some View {
+    private var welcomePanel: some View {
         VStack(spacing: ByVpnSpacing.large) {
             Spacer()
             Image("byvpnShield", bundle: .main)
@@ -121,7 +121,7 @@ private extension LabAuthFlowView {
         }
     }
 
-    func credentialForm(
+    private func credentialForm(
         title: String,
         submitLabel: String,
         showConfirmPassword: Bool,
@@ -204,7 +204,7 @@ private extension LabAuthFlowView {
         }
     }
 
-    var usernameField: some View {
+    private var usernameField: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("byvpn.auth.username".localizedString)
                 .byVpnTextStyle(.bodySmall)
@@ -225,7 +225,7 @@ private extension LabAuthFlowView {
         }
     }
 
-    func passwordField(
+    private func passwordField(
         title: String,
         text: Binding<String>,
         field: Field,
@@ -280,7 +280,7 @@ private extension LabAuthFlowView {
         }
     }
 
-    var fieldBackground: some View {
+    private var fieldBackground: some View {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
             .stroke(Color.ByVpn.primary.opacity(0.35), lineWidth: 1)
             .background(

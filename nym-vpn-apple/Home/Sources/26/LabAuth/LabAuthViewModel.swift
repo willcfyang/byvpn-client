@@ -52,11 +52,11 @@ final class LabAuthViewModel {
 
         if mode == .register {
             if password.count < 8 {
-                fail("Password must be at least 8 characters")
+                fail("byvpn.auth.error.passwordTooShort".localizedString)
                 return
             }
             if password != confirmPassword {
-                fail("Passwords do not match")
+                fail("byvpn.auth.error.passwordMismatch".localizedString)
                 return
             }
         }
@@ -76,8 +76,8 @@ final class LabAuthViewModel {
                     SnackbarManager.shared.enqueue(
                         SnackbarItem(
                             style: .confirmation,
-                            title: "Registered",
-                            message: "Account created. You can sign in now."
+                            title: "byvpn.auth.registered.title".localizedString,
+                            message: "byvpn.auth.registered.message".localizedString
                         )
                     )
                     onRegistered?()
@@ -108,9 +108,10 @@ final class LabAuthViewModel {
         if let lab = error as? LabAuthClient.LabAuthError {
             switch lab {
             case .unauthorized:
-                return "Invalid username or password"
+                // Lab API never distinguishes missing user vs bad password.
+                return "byvpn.auth.error.invalidCredentials".localizedString
             case .conflict:
-                return "Username already taken"
+                return "byvpn.auth.error.usernameTaken".localizedString
             default:
                 return lab.localizedDescription
             }

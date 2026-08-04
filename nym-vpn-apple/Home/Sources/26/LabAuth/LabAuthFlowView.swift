@@ -11,10 +11,19 @@ struct LabAuthFlowView: View {
         case login
     }
 
+    private enum Field: Hashable {
+        case username
+        case password
+        case confirmPassword
+    }
+
     let credentialsManager: CredentialsManager
 
     @State private var step: Step = .welcome
     @State private var viewModel: LabAuthViewModel
+    @FocusState private var focusedField: Field?
+    @State private var isPasswordVisible = false
+    @State private var isConfirmPasswordVisible = false
 
     init(credentialsManager: CredentialsManager) {
         self.credentialsManager = credentialsManager
@@ -62,6 +71,16 @@ struct LabAuthFlowView: View {
             }
             .animation(.easeInOut, value: step)
             .padding(.horizontal, ByVpnSpacing.component)
+        }
+        .onChange(of: step) { _, newValue in
+            isPasswordVisible = false
+            isConfirmPasswordVisible = false
+            switch newValue {
+            case .login, .register:
+                focusedField = .username
+            case .welcome:
+                focusedField = nil
+            }
         }
     }
 }
@@ -132,13 +151,33 @@ private extension LabAuthFlowView {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(spacing: ByVpnSpacing.component) {
-                field(title: "byvpn.auth.username".localizedString, text: $viewModel.username, isSecure: false)
-                field(title: "byvpn.auth.password".localizedString, text: $viewModel.password, isSecure: true)
+                usernameField
+                passwordField(
+                    title: "byvpn.auth.password".localizedString,
+                    text: $viewModel.password,
+                    field: .password,
+                    isVisible: $isPasswordVisible,
+                    submitLabel: showConfirmPassword ? .next : .go,
+                    onSubmit: {
+                        if showConfirmPassword {
+                            focusedField = .confirmPassword
+                        } else {
+                            focusedField = nil
+                            onSubmit()
+                        }
+                    }
+                )
                 if showConfirmPassword {
-                    field(
+                    passwordField(
                         title: "byvpn.auth.confirmPassword".localizedString,
                         text: $viewModel.confirmPassword,
-                        isSecure: true
+                        field: .confirmPassword,
+                        isVisible: $isConfirmPasswordVisible,
+                        submitLabel: .go,
+                        onSubmit: {
+                            focusedField = nil
+                            onSubmit()
+                        }
                     )
                 }
             }
@@ -158,36 +197,95 @@ private extension LabAuthFlowView {
                 isDisabled: viewModel.submissionState == .loading
             ) {
                 ImpactGenerator.shared.softImpact()
+                focusedField = nil
                 onSubmit()
             }
             .padding(.bottom, ByVpnSpacing.section)
         }
     }
 
-    func field(title: String, text: Binding<String>, isSecure: Bool) -> some View {
+    var usernameField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("byvpn.auth.username".localizedString)
+                .byVpnTextStyle(.bodySmall)
+                .foregroundStyle(Color.ByVpn.textSecondary)
+            TextField("", text: $viewModel.username)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .textContentType(.username)
+                .keyboardType(.asciiCapable)
+                .submitLabel(.next)
+                .focused($focusedField, equals: .username)
+                .onSubmit { focusedField = .password }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .background(fieldBackground)
+                .contentShape(Rectangle())
+                .onTapGesture { focusedField = .username }
+        }
+    }
+
+    func passwordField(
+        title: String,
+        text: Binding<String>,
+        field: Field,
+        isVisible: Binding<Bool>,
+        submitLabel: SubmitLabel,
+        onSubmit: @escaping () -> Void
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .byVpnTextStyle(.bodySmall)
                 .foregroundStyle(Color.ByVpn.textSecondary)
-            Group {
-                if isSecure {
-                    SecureField("", text: text)
-                } else {
-                    TextField("", text: text)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+            HStack(spacing: 8) {
+                Group {
+                    if isVisible.wrappedValue {
+                        TextField("", text: text)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    } else {
+                        SecureField("", text: text)
+                    }
                 }
+                .textContentType(.password)
+                .submitLabel(submitLabel)
+                .focused($focusedField, equals: field)
+                .onSubmit(onSubmit)
+
+                Button {
+                    ImpactGenerator.shared.softImpact()
+                    isVisible.wrappedValue.toggle()
+                } label: {
+                    Image(systemName: isVisible.wrappedValue ? "eye.slash.fill" : "eye.fill")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.ByVpn.textSecondary)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    Text(
+                        isVisible.wrappedValue
+                            ? "byvpn.auth.hidePassword".localizedString
+                            : "byvpn.auth.showPassword".localizedString
+                    )
+                )
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
+            .padding(.leading, 14)
+            .padding(.trailing, 6)
+            .padding(.vertical, 8)
+            .background(fieldBackground)
+            .contentShape(Rectangle())
+            .onTapGesture { focusedField = field }
+        }
+    }
+
+    var fieldBackground: some View {
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .stroke(Color.ByVpn.primary.opacity(0.35), lineWidth: 1)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.ByVpn.primary.opacity(0.35), lineWidth: 1)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.ByVpn.backgroundCard)
-                    )
+                    .fill(Color.ByVpn.backgroundCard)
             )
-        }
     }
 }

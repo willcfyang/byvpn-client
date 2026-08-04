@@ -64,13 +64,23 @@
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>LabMock</key>
-	<false/>
+	<true/>
 	<key>LabAuthBaseURL</key>
-	<string></string>
+	<string>http://104.250.122.199:8088/api/public/v1/lab/auth</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>104.250.122.199</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+		</dict>
 	</dict>
 	<key>NSFaceIDUsageDescription</key>
 	<string>We use Face ID to unlock secure information.</string>

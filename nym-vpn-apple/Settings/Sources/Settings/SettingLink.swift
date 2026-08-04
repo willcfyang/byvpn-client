@@ -5,8 +5,10 @@ public enum SettingLink: Hashable, Identifiable {
     case addCredentials(navigationSource: AddCredentialsNavigationSource)
     case accountWelcome(type: AccountWelcomeType, navigationSource: AccountWelcomeNavigationSource)
     case generatePassphrase(displayPurchaseView: Bool)
+    case selectPlan
     case processingAccount
     case passphrase
+    case verifyMnemonic(words: [String])
     case appearance
     case displayTheme
     case logs

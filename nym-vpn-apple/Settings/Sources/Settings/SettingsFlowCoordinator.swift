@@ -36,10 +36,18 @@ struct SettingsFlowCoordinator<Content: View>: View {
             accountWelcomeDestination(type: type, navigationSource: navigationSource)
         case let .generatePassphrase(displayPurchaseView: displayPurchaseView):
             GeneratePassphraseView(path: $flowState.path, displayPurchaseView: displayPurchaseView)
+        case .selectPlan:
+#if os(iOS)
+            SelectPlanView(path: $flowState.path)
+#else
+            EmptyView()
+#endif
         case .processingAccount:
             ProcessingAccountView(path: $flowState.path)
         case .passphrase:
             PassphraseView(path: $flowState.path)
+        case let .verifyMnemonic(words: words):
+            MnemonicVerifyView(path: $flowState.path, words: words)
         case .logs:
             logsDestination()
         case .acknowledgments:

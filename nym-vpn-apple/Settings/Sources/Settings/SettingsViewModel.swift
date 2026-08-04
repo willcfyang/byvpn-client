@@ -38,6 +38,7 @@ import Theme
 #endif
     @Published var sections: [AppSettingsSection] = []
     @Published var accountIdentifier: String?
+    let isTabRoot: Bool
 #if os(macOS)
     var autologinState: AutologinState?
 #endif
@@ -59,7 +60,8 @@ import Theme
         externalLinkManager: ExternalLinkManager,
         featureFlagsManager: FeatureFlagsManager,
         impactGenerator: ImpactGenerator,
-        purchasesManager: PurchasesManager
+        purchasesManager: PurchasesManager,
+        isTabRoot: Bool = false
     ) {
         self.appSettings = appSettings
         self.configurationManager = configurationManager
@@ -69,6 +71,7 @@ import Theme
         self.featureFlagsManager = featureFlagsManager
         self.impactGenerator = impactGenerator
         self.purchasesManager = purchasesManager
+        self.isTabRoot = isTabRoot
         super.init(path: path)
         setup()
     }
@@ -82,7 +85,8 @@ import Theme
         credentialsManager: CredentialsManager,
         externalLinkManager: ExternalLinkManager,
         featureFlagsManager: FeatureFlagsManager,
-        impactGenerator: ImpactGenerator
+        impactGenerator: ImpactGenerator,
+        isTabRoot: Bool = false
     ) {
         _isServing = isServing
         self.appSettings = appSettings
@@ -92,6 +96,7 @@ import Theme
         self.externalLinkManager = externalLinkManager
         self.featureFlagsManager = featureFlagsManager
         self.impactGenerator = impactGenerator
+        self.isTabRoot = isTabRoot
         super.init(path: path)
         setup()
     }
@@ -101,6 +106,11 @@ import Theme
         guard !path.isEmpty else { return }
         impactGenerator.softImpact()
         path.removeLast()
+    }
+
+    func navigateToPremiumPlan() {
+        impactGenerator.softImpact()
+        path.append(SettingLink.selectPlan)
     }
 
     func navigateToSantasMenu() {
@@ -297,7 +307,7 @@ private extension SettingsViewModel {
         viewModels.append(
             SettingsListItemViewModel(
                 accessory: .arrow,
-                title: "settings.passphrase".localizedString,
+                title: "byvpn.settings.mnemonic".localizedString,
                 imageName: "key",
                 action: { [weak self] in
                     Task { @MainActor in

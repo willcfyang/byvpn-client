@@ -89,7 +89,7 @@ public struct PassphraseView: View {
 private extension PassphraseView {
     var navbar: some View {
         CustomNavBar(
-            title: "settings.passphrase".localizedString,
+            title: "byvpn.settings.mnemonic".localizedString,
             useElevationBackground: true,
             isLogoImageHidden: true,
             leftButton: CustomNavBarButton(
@@ -111,7 +111,7 @@ private extension PassphraseView {
 
     var title: some View {
         HStack(spacing: 0) {
-            Text("passphrase.yourPassphrase".localizedString)
+            Text("byvpn.mnemonic.reveal.title".localizedString)
                 .byVpnTextStyle(.bodyLarge)
                 .foregroundStyle(Color.ByVpn.textPrimary)
             Spacer()
@@ -120,7 +120,7 @@ private extension PassphraseView {
 
     var subtitle: some View {
         HStack(spacing: 0) {
-            Text("passphrase.masterPassphrase".localizedString)
+            Text("byvpn.mnemonic.reveal.subtitle".localizedString)
                 .byVpnTextStyle(.bodyDefault)
                 .foregroundStyle(Color.ByVpn.textSecondary)
                 .multilineTextAlignment(.leading)
@@ -152,7 +152,7 @@ private extension PassphraseView {
                 .frame(width: 20, height: 20)
             Spacer()
                 .frame(width: 8)
-            Text("passphrase.showMyPassphrase".localizedString)
+            Text("byvpn.mnemonic.reveal.cta".localizedString)
                 .byVpnTextStyle(.bodyLarge)
                 .foregroundStyle(Color.ByVpn.textPrimary)
         }
@@ -303,17 +303,17 @@ private extension PassphraseView {
     }
 
     @ViewBuilder var savedConfirmationButton: some View {
-        if appSettings.isPassphraseStored {
+        if appSettings.isPassphraseStored || (mnemonic != nil && !(mnemonic?.isEmpty ?? true)) {
             Spacer()
                 .frame(height: 16)
 
-            GenericButton(title: "passphrase.continue".localizedString)
+            GenericButton(title: "byvpn.mnemonic.backup.cta".localizedString)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .onTapGesture {
-                    navigateBack()
+                    navigateToVerify()
                 }
                 .accessibilityAction {
-                    navigateBack()
+                    navigateToVerify()
                 }
         }
     }
@@ -322,6 +322,14 @@ private extension PassphraseView {
 private extension PassphraseView {
     func navigateBack() {
         if !path.isEmpty { path.removeLast() }
+    }
+
+    func navigateToVerify() {
+        guard let mnemonic, !mnemonic.isEmpty else { return }
+        let words = mnemonic.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        guard !words.isEmpty else { return }
+        impactGenerator.softImpact()
+        path.append(SettingLink.verifyMnemonic(words: words))
     }
 
     func showPassphraseDidTap() {

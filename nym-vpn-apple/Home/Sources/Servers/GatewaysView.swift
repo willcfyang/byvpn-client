@@ -84,7 +84,9 @@ public struct GatewaysView: View {
             isSearchFocused = false
         }
         .onAppear {
-            isSearchFocused = true
+            if viewModel.presentationStyle != .tabRoot {
+                isSearchFocused = true
+            }
         }
     }
 }
@@ -92,8 +94,12 @@ public struct GatewaysView: View {
 private extension GatewaysView {
     func navbar() -> some View {
         CustomNavBar(
-            title: viewModel.type.hopLocalizedTitle,
-            leftButton: CustomNavBarButton(type: .back, action: { viewModel.navigateHome() }),
+            title: viewModel.presentationStyle == .tabRoot
+                ? "byvpn".localizedString
+                : viewModel.type.hopLocalizedTitle,
+            leftButton: viewModel.presentationStyle == .tabRoot
+                ? CustomNavBarButton(type: .empty, action: {})
+                : CustomNavBarButton(type: .back, action: { viewModel.navigateHome() }),
             rightButton: CustomNavBarButton(type: .info, action: { viewModel.displayInfoTooltip() })
         )
     }

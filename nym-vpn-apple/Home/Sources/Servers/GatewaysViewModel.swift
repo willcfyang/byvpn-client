@@ -13,6 +13,7 @@ import UIComponents
     let gatewayManager: GatewayManager
     let type: HopType
     let minimumSearchSymbols = 2
+    let presentationStyle: GatewaysPresentationStyle
 
     @ObservedObject var appSettings: AppSettings
     @ObservedObject var connectionManager: ConnectionManager
@@ -44,7 +45,8 @@ import UIComponents
         appSettings: AppSettings,
         connectionManager: ConnectionManager,
         gatewayManager: GatewayManager,
-        featureFlagsManager: FeatureFlagsManager
+        featureFlagsManager: FeatureFlagsManager,
+        presentationStyle: GatewaysPresentationStyle = .pushed
     ) {
         _path = path
         self.type = type
@@ -52,6 +54,7 @@ import UIComponents
         self.connectionManager = connectionManager
         self.gatewayManager = gatewayManager
         self.featureFlagsManager = featureFlagsManager
+        self.presentationStyle = presentationStyle
 
         switch type {
         case .entry:
@@ -61,6 +64,11 @@ import UIComponents
         }
         setup()
     }
+}
+
+public enum GatewaysPresentationStyle {
+    case pushed
+    case tabRoot
 }
 
 extension GatewaysViewModel {

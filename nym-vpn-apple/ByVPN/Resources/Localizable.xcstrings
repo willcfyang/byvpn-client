@@ -2948,97 +2948,97 @@
         "ar": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "de": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "es": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "fa": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "it": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "pt": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "new",
-            "value": "Initializing Nym"
+            "value": "Initializing ByVPN"
           }
         }
       }
@@ -7294,7 +7294,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "May limit Nym connectivity."
+            "value": "May limit ByVPN connectivity."
           }
         }
       }
@@ -7327,7 +7327,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nym’s default DNS:"
+            "value": "ByVPN’s default DNS:"
           }
         }
       }
@@ -7393,7 +7393,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "By default, using Nym's recommended DNS servers. Configure custom servers below if needed."
+            "value": "By default, using ByVPN's recommended DNS servers. Configure custom servers below if needed."
           }
         }
       }
@@ -12295,7 +12295,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nym build version"
+            "value": "ByVPN build version"
           }
         },
         "es": {
@@ -12373,7 +12373,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nym 构建版本"
+            "value": "ByVPN 构建版本"
           }
         }
       }
@@ -13237,7 +13237,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "More details in the Nym"
+            "value": "More details in the ByVPN"
           }
         },
         "es": {
@@ -13315,7 +13315,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nym的更多详细信息"
+            "value": "ByVPN的更多详细信息"
           }
         }
       }
@@ -22560,7 +22560,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nym’s decentralized network makes \"no-log\" promises obsolete."
+            "value": "ByVPN’s decentralized network makes \"no-log\" promises obsolete."
           }
         }
       }
@@ -22692,7 +22692,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nym entry server"
+            "value": "Entry server"
           }
         }
       }
@@ -22703,7 +22703,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nym exit server"
+            "value": "Exit server"
           }
         }
       }
@@ -22825,7 +22825,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Never share them with anyone, including Nym Support."
+            "value": "Never share them with anyone, including ByVPN Support."
           }
         },
         "es": {
@@ -22903,7 +22903,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "永远不要与任何人分享，包括Nym团队。"
+            "value": "永远不要与任何人分享，包括ByVPN团队。"
           }
         }
       }
@@ -25707,7 +25707,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Retrieving your anonymous account credentials (zk-nyms)..."
+            "value": "Retrieving your anonymous account credentials (credentials)..."
           }
         },
         "es": {
@@ -25785,7 +25785,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在获取您的匿名帐户凭据(zk-nyms)..."
+            "value": "正在获取您的匿名帐户凭据(credentials)..."
           }
         }
       }
@@ -25808,7 +25808,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Saving your zk-nyms on the device..."
+            "value": "Saving your credentials on the device..."
           }
         },
         "es": {
@@ -25886,7 +25886,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "正在保存您的zk-nyms到设备本地..."
+            "value": "正在保存您的credentials到设备本地..."
           }
         }
       }
@@ -26009,7 +26009,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use this in MetaMask or other Web3 wallets to make RPC calls through the Nym mixnet. Replace <your-provider-url> with your actual RPC endpoint."
+            "value": "Use this in MetaMask or other Web3 wallets to make RPC calls through the mixnet. Replace <your-provider-url> with your actual RPC endpoint."
           }
         }
       }
@@ -26108,7 +26108,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Add this to your browser's proxy settings to route traffic through the Nym mixnet"
+            "value": "Add this to your browser's proxy settings to route traffic through the mixnet"
           }
         }
       }
@@ -26152,7 +26152,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Routes app and wallet traffic through the Nym mixnet for enhanced privacy via a SOCKS5 proxy for apps and HTTP RPC proxy for wallets."
+            "value": "Routes app and wallet traffic through the mixnet for enhanced privacy via a SOCKS5 proxy for apps and HTTP RPC proxy for wallets."
           }
         }
       }
@@ -26230,7 +26230,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose plan"
+            "value": "Select a plan"
           }
         },
         "es": {
@@ -26307,8 +26307,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "选择您的 ByVPN 计划"
+            "state": "translated",
+            "value": "选择套餐"
           }
         }
       }
@@ -26331,7 +26331,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose your subscription plan"
+            "value": "Select a plan"
           }
         },
         "es": {
@@ -26408,8 +26408,8 @@
         },
         "zh-Hans": {
           "stringUnit": {
-            "state": "needs_review",
-            "value": "您的 ByVPN 账户已准备好🎉"
+            "state": "translated",
+            "value": "选择套餐"
           }
         }
       }
@@ -27127,7 +27127,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Requesting ZkNyms..."
+            "value": "Loading account…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在加载账户…"
           }
         }
       }
@@ -28350,7 +28356,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Safe to share. Use to contact Nym Support."
+            "value": "Safe to share. Use to contact ByVPN Support."
           }
         }
       }
@@ -28449,7 +28455,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Linking a social account with your Nym account reduces your anonymity. Changes take effect after logging out and logging back in with the chosen social. "
+            "value": "Linking a social account with your ByVPN account reduces your anonymity. Changes take effect after logging out and logging back in with the chosen social. "
           }
         }
       }
@@ -32958,7 +32964,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Payment received\nRequesting ZkNyms..."
+            "value": "Payment received\nRequesting credentials..."
           }
         }
       }
@@ -34012,7 +34018,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Helps us improve the Nym network. No logging or activity tracked."
+            "value": "Helps us improve the ByVPN network. No logging or activity tracked."
           }
         }
       }
@@ -36670,6 +36676,582 @@
           "stringUnit": {
             "state": "translated",
             "value": "是"
+          }
+        }
+      }
+    },
+    "byvpn.tab.home": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "首页"
+          }
+        }
+      }
+    },
+    "byvpn.tab.nodes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Servers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "节点"
+          }
+        }
+      }
+    },
+    "byvpn.tab.settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置"
+          }
+        }
+      }
+    },
+    "byvpn.splash.slogan": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stable, Fast, Secure"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "稳定、快速、安全"
+          }
+        }
+      }
+    },
+    "byvpn.splash.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open the world — connect securely your way"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开世界 以你的方式安全连接"
+          }
+        }
+      }
+    },
+    "byvpn.auth.signup.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign up"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "注册"
+          }
+        }
+      }
+    },
+    "byvpn.auth.signup.submit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign up"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "注册"
+          }
+        }
+      }
+    },
+    "byvpn.auth.login.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录"
+          }
+        }
+      }
+    },
+    "byvpn.auth.login.submit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录"
+          }
+        }
+      }
+    },
+    "byvpn.auth.username": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Username"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户名"
+          }
+        }
+      }
+    },
+    "byvpn.auth.password": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密码"
+          }
+        }
+      }
+    },
+    "byvpn.auth.confirmPassword": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm password"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认密码"
+          }
+        }
+      }
+    },
+    "byvpn.home.duration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection duration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接时长"
+          }
+        }
+      }
+    },
+    "byvpn.home.selectNode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a server"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择节点"
+          }
+        }
+      }
+    },
+    "byvpn.home.tapToSelect": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to choose location"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击选择节点"
+          }
+        }
+      }
+    },
+    "byvpn.premium.banner.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go Premium"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开通高级会员"
+          }
+        }
+      }
+    },
+    "byvpn.premium.banner.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock all features, no ads, unlimited use"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解锁全部功能、无广告、畅享使用"
+          }
+        }
+      }
+    },
+    "byvpn.settings.mnemonic": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recovery phrase"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "助记词"
+          }
+        }
+      }
+    },
+    "byvpn": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "byvpn"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "byvpn"
+          }
+        }
+      }
+    },
+    "byvpn.plan.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a plan"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择套餐"
+          }
+        }
+      }
+    },
+    "byvpn.plan.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock Premium with a monthly or yearly plan."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开通高级会员，支持按月或按年订阅。"
+          }
+        }
+      }
+    },
+    "byvpn.plan.cta": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续"
+          }
+        }
+      }
+    },
+    "byvpn.plan.purchasing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Purchasing…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "购买中…"
+          }
+        }
+      }
+    },
+    "byvpn.plan.monthly": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monthly"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "月付"
+          }
+        }
+      }
+    },
+    "byvpn.plan.yearly": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yearly"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "年付"
+          }
+        }
+      }
+    },
+    "byvpn.plan.unavailable.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plans unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无可用套餐"
+          }
+        }
+      }
+    },
+    "byvpn.plan.unavailable.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Store products are not available on this build. You can still explore the app."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前构建无法加载商店商品，仍可继续使用应用。"
+          }
+        }
+      }
+    },
+    "byvpn.mnemonic.reveal.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your recovery phrase"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的助记词"
+          }
+        }
+      }
+    },
+    "byvpn.mnemonic.reveal.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Write these words down and keep them offline. Anyone with this phrase can access your account."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请抄写并离线保存。任何持有助记词的人都能访问你的账户。"
+          }
+        }
+      }
+    },
+    "byvpn.mnemonic.reveal.cta": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal phrase"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示助记词"
+          }
+        }
+      }
+    },
+    "byvpn.mnemonic.backup.cta": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backup manually"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手动备份"
+          }
+        }
+      }
+    },
+    "byvpn.mnemonic.verify.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verify phrase"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "校验助记词"
+          }
+        }
+      }
+    },
+    "byvpn.mnemonic.verify.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap the words in the correct order."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请按正确顺序点选单词。"
+          }
+        }
+      }
+    },
+    "byvpn.mnemonic.verify.selected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected order"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已选顺序"
+          }
+        }
+      }
+    },
+    "byvpn.mnemonic.verify.error": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Order incorrect. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顺序不正确，请重试。"
+          }
+        }
+      }
+    },
+    "byvpn.mnemonic.verify.confirm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm backup"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认备份"
           }
         }
       }

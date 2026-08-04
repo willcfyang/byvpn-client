@@ -208,25 +208,11 @@ private extension GeneratePassphraseView {
     var selectPlanButton: some View {
         GenericButton(title: "purchasePlan.selectPlan".localizedString, isLoading: $isPurchasing)
             .onTapGesture {
-                selectPlanAction()
+                navigateToSelectPlan()
             }
             .accessibilityAction {
-                selectPlanAction()
+                navigateToSelectPlan()
             }
-#if os(iOS)
-            .confirmationDialog(
-                "createAccount.success.choosePlan".localizedString,
-                isPresented: $isPlanAlertDisplayed,
-                titleVisibility: .visible
-            ) {
-                ForEach(purchasesManager.products, id: \.id) { plan in
-                    Button(subscriptionTitle(for: plan)) {
-                        purchasePlan(with: plan)
-                    }
-                }
-                Button("cancel".localizedString, role: .cancel) {}
-            }
-#endif
     }
 }
 
@@ -234,5 +220,9 @@ private extension GeneratePassphraseView {
 extension GeneratePassphraseView {
     func navigateToPaymentSuccessView() {
         path.append(SettingLink.processingAccount)
+    }
+
+    func navigateToSelectPlan() {
+        path.append(SettingLink.selectPlan)
     }
 }

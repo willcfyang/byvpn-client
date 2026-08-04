@@ -72,16 +72,51 @@ private extension SettingsView {
     @ViewBuilder
     func navbar() -> some View {
         CustomNavBar(
-            title: viewModel.settingsTitle,
+            title: viewModel.isTabRoot ? "byvpn".localizedString : viewModel.settingsTitle,
             backgroundColorOverride: Color.ByVpn.navBarBackground,
             leftButton: CustomNavBarButton(type: .empty, action: {}),
-            rightButton: CustomNavBarButton(type: .close, action: { viewModel.navigateBack() })
+            rightButton: viewModel.isTabRoot
+                ? CustomNavBarButton(type: .empty, action: {})
+                : CustomNavBarButton(type: .close, action: { viewModel.navigateBack() })
         )
     }
 
     @ViewBuilder
     func settingsList() -> some View {
-        SettingsList(viewModel: SettingsListViewModel(sections: viewModel.sections))
+        VStack(spacing: ByVpnSpacing.component) {
+            if viewModel.isTabRoot {
+                premiumBanner
+            }
+            SettingsList(viewModel: SettingsListViewModel(sections: viewModel.sections))
+        }
+    }
+
+    var premiumBanner: some View {
+        Button {
+            viewModel.navigateToPremiumPlan()
+        } label: {
+            HStack(spacing: ByVpnSpacing.medium) {
+                Image(systemName: "crown.fill")
+                    .foregroundStyle(Color.yellow)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("byvpn.premium.banner.title".localizedString)
+                        .byVpnTextStyle(.bodyDefault)
+                        .foregroundStyle(Color.white)
+                        .multilineTextAlignment(.leading)
+                    Text("byvpn.premium.banner.subtitle".localizedString)
+                        .byVpnTextStyle(.bodySmall)
+                        .foregroundStyle(Color.white.opacity(0.9))
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(ByVpnSpacing.component)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.ByVpn.primary)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     func appVersionText() -> some View {

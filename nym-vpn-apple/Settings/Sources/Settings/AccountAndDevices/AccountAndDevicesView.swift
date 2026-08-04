@@ -297,7 +297,7 @@ extension AccountAndDevicesView {
     func navigateToPlanPurchase() {
         impactGenerator.softImpact()
 #if os(iOS)
-        path.append(SettingLink.generatePassphrase(displayPurchaseView: true))
+        path.append(SettingLink.selectPlan)
 #elseif os(macOS)
         autologinState.start(kind: .autologinRenew, using: credentialsManager)
 #endif

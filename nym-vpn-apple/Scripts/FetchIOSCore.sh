@@ -125,14 +125,20 @@ normalize_and_copy_core() {
   fi
 
   # Rewrite module + NymVpn* → ByVpn*; keep NymGateway*/NymDeeplink*/NymEnvironment
+  # macOS BSD sed needs `sed -i ''`; GNU sed needs `sed -i`.
+  if sed --version >/dev/null 2>&1; then
+    SED_INPLACE=(sed -i)
+  else
+    SED_INPLACE=(sed -i '')
+  fi
   find "$src" -type f \( -name '*.swift' -o -name 'Package.swift' -o -name '*.h' -o -name '*.modulemap' \) -print0 \
-    | xargs -0 sed -i \
+    | xargs -0 "${SED_INPLACE[@]}" \
       -e 's/NymVPNLib/ByVpnCore/g' \
       -e 's/NymVpn/ByVpn/g' \
       2>/dev/null || true
 
   if [[ -f "$src/Package.swift" ]]; then
-    sed -i 's/name: "NymVPNLib"/name: "ByVpnCore"/g' "$src/Package.swift" 2>/dev/null || true
+    "${SED_INPLACE[@]}" 's/name: "NymVPNLib"/name: "ByVpnCore"/g' "$src/Package.swift" 2>/dev/null || true
   fi
 
   # SPM expects Sources/<target>; upstream zip uses Sources/NymVPNLib
@@ -142,6 +148,19 @@ normalize_and_copy_core() {
   fi
   if [[ -d "$src/NymVPNLibUniffi.xcframework" && ! -d "$src/ByVpnCoreUniffi.xcframework" ]]; then
     mv "$src/NymVPNLibUniffi.xcframework" "$src/ByVpnCoreUniffi.xcframework"
+  fi
+
+  # Fail loudly if the binary framework is missing/empty (common after bad rename).
+  local fw=""
+  if [[ -d "$src/ByVpnCoreUniffi.xcframework" ]]; then
+    fw="$src/ByVpnCoreUniffi.xcframework"
+  elif [[ -d "$src/NymVPNLibUniffi.xcframework" ]]; then
+    fw="$src/NymVPNLibUniffi.xcframework"
+  fi
+  if [[ -z "$fw" ]] || ! find "$fw" -type f \( -name '*.a' -o -name '*.dylib' \) | head -n 1 | grep -q .; then
+    echo "❌ Error: UniFFI xcframework missing binary artifact under $src"
+    find "$src" -maxdepth 2 -type d -print || true
+    return 1
   fi
 
   echo "Copying ByVpnCore into project root (../).."

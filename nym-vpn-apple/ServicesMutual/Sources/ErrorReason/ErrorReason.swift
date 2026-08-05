@@ -62,10 +62,6 @@ public enum ErrorReason: LocalizedError, Codable {
             self = .invalidEntryGatewayCountry
         case .invalidExitGatewayCountry:
             self = .invalidExitGatewayCountry
-        case .invalidEntryGatewayIdentity:
-            self = .invalidEntryGatewayIdentity
-        case .invalidExitGatewayIdentity:
-            self = .invalidExitGatewayIdentity
         case .maxDevicesReached:
             self = .maxDevicesReached
         case .bandwidthExceeded:
@@ -98,12 +94,9 @@ public enum ErrorReason: LocalizedError, Codable {
             self = .performantEntryGatewayUnavailable
         case .performantExitGatewayUnavailable:
             self = .performantExitGatewayUnavailable
-        case .needFullDiskPermissions:
-            self = .needFullDiskPermissions
-        case .splitTunnel:
-            self = .splitTunnel
-        case .needsRelaxedIndependenceCriteria:
-            self = .needsRelaxedIndependenceCriteria
+        @unknown default:
+            // iOS UniFFI core may omit macOS-only / newer reasons (identity, FDA, split tunnel, …).
+            self = .unknown
         }
     }
 #endif

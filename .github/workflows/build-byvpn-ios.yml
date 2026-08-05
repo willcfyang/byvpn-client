@@ -63,7 +63,10 @@ jobs:
 
       # Seconds on the runner; catches rename leftovers before ~25min UniFFI burn.
       - name: Static Swift rename contract
-        run: ./Scripts/verify-swift-rename-contract.sh
+        run: |
+          chmod +x Scripts/verify-swift-rename-contract.sh Scripts/verify-uniffi-switch-safety.sh
+          ./Scripts/verify-swift-rename-contract.sh
+          ./Scripts/verify-uniffi-switch-safety.sh
 
       - name: Select Xcode
         run: |

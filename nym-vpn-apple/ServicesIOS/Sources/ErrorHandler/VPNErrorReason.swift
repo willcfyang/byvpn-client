@@ -43,192 +43,53 @@ public enum VPNErrorReason: LocalizedError {
 
     // MARK: - Initializer from VpnError
 
-    // swiftlint:disable:next function_body_length
+    /// Map UniFFI `VpnError` without switching on generated cases.
+    /// develop core churns enum cases frequently; description mapping stays compile-safe.
     public init(with vpnError: VpnError) {
-        switch vpnError {
-        case let .Initialization(details: details):
-            self = .initialization(details: details)
-        case let .InternalError(details: details):
-            self = .internalError(details: details)
-        case let .Storage(details: details):
-            self = .storage(details: details)
-        case let .NetworkConnectionError(details: details):
-            self = .networkConnectionError(details: details)
-        case let .InvalidStateError(details: details):
-            self = .invalidStateError(details: details)
-        case .NoAccountStored:
-            self = .noAccountStored
-        case .AccountNotRegistered:
-            self = .accountNotRegistered
-        case .NoDeviceIdentity:
-            self = .noDeviceIdentity
-        case let .VpnApi(details: vpnApiErrorResponse):
-            switch vpnApiErrorResponse {
-            case .Timeout:
-                self = .vpnApiTimeout
-            case let .StatusCode(code: code, msg: message):
-                self = .vpnApi(details: String("\(code): \(message)"))
-            case let .Response(errorResponse):
-                self = .vpnApi(details: errorResponse.message)
-            }
-        case .VpnApiTimeout:
-            self = .vpnApiTimeout
-        case let .InvalidMnemonic(details: details):
-            self = .invalidMnemonic(details: details)
-        case let .UnregisterDevice(details: details):
-            self = .unregisterDevice(details: details)
-        case let .RequestZkNym(details: details):
-            let messageString: String
-            switch details {
-            case let .GetZkNymsAvailableForDownloadEndpointFailure(response: response):
-                switch response {
-                case .Timeout:
-                    self = .vpnApiTimeout
-                    return
-                case let .StatusCode(code: code, msg: message):
-                    self = .vpnApi(details: String("\(code): \(message)"))
-                    return
-                case let .Response(errorResponse):
-                    self = .vpnApi(details: errorResponse.message)
-                    return
-                }
-            case let .CreateEcashKeyPair(response):
-                messageString = response
-            case let .ConstructWithdrawalRequest(response):
-                messageString = response
-            case let .RequestZkNymEndpointFailure(ticketType: _, response: response):
-                switch response {
-                case .Timeout:
-                    self = .vpnApiTimeout
-                    return
-                case let .StatusCode(code: code, msg: message):
-                    self = .vpnApi(details: String("\(code): \(message)"))
-                    return
-                case let .Response(errorResponse):
-                    self = .vpnApi(details: errorResponse.message)
-                    return
-                }
-            case let .InvalidTicketTypeInResponse(response):
-                messageString = response
-            case .TicketTypeMismatch:
-                messageString = "Ticket type mismatch"
-            case let .PollZkNymEndpointFailure(response: response):
-                switch response {
-                case .Timeout:
-                    self = .vpnApiTimeout
-                    return
-                case let .StatusCode(code: code, msg: message):
-                    self = .vpnApi(details: String("\(code): \(message)"))
-                    return
-                case let .Response(errorResponse):
-                    self = .vpnApi(details: errorResponse.message)
-                    return
-                }
-            case .PollingTimeout:
-                self = .vpnApiTimeout
-                return
-            case .MissingBlindedShares:
-                messageString = "Missing blinded shares"
-            case let .ResponseHasInvalidMasterVerificationKey(response):
-                messageString = response
-            case .EpochIdMismatch:
-                messageString = "Epoch ID mismatch"
-            case .ExpirationDateMismatch:
-                messageString = "Expiration date mismatch"
-            case let .GetPartialVerificationKeysEndpointFailure(epochId: _, response: response):
-                switch response {
-                case .Timeout:
-                    self = .vpnApiTimeout
-                    return
-                case let .StatusCode(code: code, msg: message):
-                    self = .vpnApi(details: String("\(code): \(message)"))
-                    return
-                case let .Response(errorResponse):
-                    self = .vpnApi(details: errorResponse.message)
-                    return
-                }
-            case .NoMasterVerificationKeyInStorage:
-                messageString = "No master verification key in storage"
-            case .NoCoinIndexSignaturesInStorage:
-                messageString = "No coin index signatures in storage"
-            case .NoExpirationDateSignaturesInStorage:
-                messageString = "No expiration date signatures in storage"
-            case let .InvalidVerificationKey(details):
-                messageString = details
-            case let .DeserializeBlindedSignature(details):
-                messageString = details
-            case .DecodedKeysMissingIndex:
-                messageString = "Decoded keys missing index"
-            case let .ImportZkNym(ticketType: ticketType, error: error):
-                messageString = "\(ticketType): \(error)"
-            case let .AggregateWallets(details):
-                messageString = details
-            case let .ConfirmZkNymDownloadEndpointFailure(id: _, response: response):
-                switch response {
-                case .Timeout:
-                    self = .vpnApiTimeout
-                    return
-                case let .StatusCode(code: code, msg: message):
-                    self = .vpnApi(details: String("\(code): \(message)"))
-                    return
-                case let .Response(errorResponse):
-                    self = .vpnApi(details: errorResponse.message)
-                    return
-                }
-            case let .MissingPendingRequest(details):
-                messageString = details
-            case let .CredentialStorage(details):
-                messageString = details
-            case let .UnexpectedErrorResponse(details):
-                messageString = details
-            case let .Internal(details):
-                self = .internalError(details: details)
-                return
-            case .ZkNymRevoked:
-                messageString = "ZkNym revoked"
-            case .IssuanceError:
-                messageString = "Issuance error"
-            case .MalformedUpgradeModeJwt:
-                messageString = "Malformed upgrade mode JWT"
-            case let .InconsistentResponse(reason: reason):
-                messageString = reason
-            }
-            self = .requestZknym(details: messageString)
-        case let .UnexpectedVpnApiResponse(details: details):
-            self = .unexpectedVpnApiResponse(details: details)
-        case let .FailedAccountRegistration(details: details):
-            self = .failedAccountRegistration(details: details)
-        case .ExistingAccount:
-            self = .existingAccount
-        case let .AccountControllerError(details: details):
-            self = .accountControllerError(details: details)
-        case let .HttpClient(details):
-            self = .httpClient(details: details)
-        case .AccountDoesntExistOnChain:
-            self = .accountDoesntExistOnChain
-        case .AccountNotDecentralised:
-            self = .accountNotDecentralised
-        case .AccountDecentralised:
-            self = .accountDecentralised
-        case .InsufficientFunds:
-            self = .insufficientFunds
-        case let .ZkNymAcquisitionFailure(details: details):
-            self = .zkNymAcquisitionFailure(details: details)
-        case let .NyxdConnectionFailure(details: details):
-            self = .nyxdConnectionFailure(details: details)
-        case let .NyxdQueryFailure(details: details):
-            self = .nyxdQueryFailure(details: details)
-        case let .InvalidSecret(details: details):
-            self = .invalidSecret(details: details)
-        case let .InitLogs(details: details):
-            self = .initLogs(details: details)
-        case let .DeeplinkError(details: details):
-            self = .deeplinkError(details: details)
-        case let .FetchEnvironment(details: details):
-            self = .fetchEnvironment(details: details)
-        case let .LinkPrivyAccount(details: details):
-            self = .linkPrivy(details: details)
+        self = Self.mapFromVpnErrorDescription(String(describing: vpnError))
+    }
+
+    private static func mapFromVpnErrorDescription(_ raw: String) -> VPNErrorReason {
+        let text = raw
+        let lower = raw.lowercased()
+
+        if lower.contains("noaccountstored") { return .noAccountStored }
+        if lower.contains("accountnotregistered") { return .accountNotRegistered }
+        if lower.contains("nodeviceidentity") { return .noDeviceIdentity }
+        if lower.contains("existingaccount") { return .existingAccount }
+        if lower.contains("offline") { return .offline }
+        if lower.contains("vpnapitimeout") || lower.contains("pollingtimeout") || lower.contains("timeout") && lower.contains("vpnapi") {
+            return .vpnApiTimeout
         }
+        if lower.contains("invalidmnemonic") { return .invalidMnemonic(details: text) }
+        if lower.contains("unregisterdevice") { return .unregisterDevice(details: text) }
+        if lower.contains("requestzknym") || lower.contains("zknym") {
+            return .requestZknym(details: text)
+        }
+        if lower.contains("unexpectedvpnapiresponse") { return .unexpectedVpnApiResponse(details: text) }
+        if lower.contains("failedaccountregistration") { return .failedAccountRegistration(details: text) }
+        if lower.contains("accountcontrollererror") { return .accountControllerError(details: text) }
+        if lower.contains("httpclient") { return .httpClient(details: text) }
+        if lower.contains("accountdoesntexistonchain") { return .accountDoesntExistOnChain }
+        if lower.contains("accountnotdecentral") { return .accountNotDecentralised }
+        if lower.contains("accountdecentral") { return .accountDecentralised }
+        if lower.contains("insufficientfunds") { return .insufficientFunds }
+        if lower.contains("nyxdconnection") { return .nyxdConnectionFailure(details: text) }
+        if lower.contains("nyxdquery") { return .nyxdQueryFailure(details: text) }
+        if lower.contains("invalidsecret") { return .invalidSecret(details: text) }
+        if lower.contains("initlogs") { return .initLogs(details: text) }
+        if lower.contains("deeplink") { return .deeplinkError(details: text) }
+        if lower.contains("fetchenvironment") { return .fetchEnvironment(details: text) }
+        if lower.contains("linkprivy") { return .linkPrivy(details: text) }
+        if lower.contains("vpnapi") { return .vpnApi(details: text) }
+        if lower.contains("initialization") { return .initialization(details: text) }
+        if lower.contains("storage") { return .storage(details: text) }
+        if lower.contains("networkconnection") { return .networkConnectionError(details: text) }
+        if lower.contains("invalidstate") { return .invalidStateError(details: text) }
+        if lower.contains("internalerror") || lower.contains("internal(") {
+            return .internalError(details: text)
+        }
+        return .internalError(details: text.isEmpty ? somethingWentWrong : text)
     }
 
     // MARK: - Initializer from NSError

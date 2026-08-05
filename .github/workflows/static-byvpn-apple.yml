@@ -32,5 +32,6 @@ jobs:
       - name: Static Swift rename contract
         working-directory: nym-vpn-apple
         run: |
-          chmod +x Scripts/verify-swift-rename-contract.sh
+          chmod +x Scripts/verify-swift-rename-contract.sh Scripts/verify-uniffi-switch-safety.sh
           ./Scripts/verify-swift-rename-contract.sh
+          ./Scripts/verify-uniffi-switch-safety.sh

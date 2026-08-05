@@ -9,18 +9,18 @@ on:
       core_source:
         description: |
           UniFFI core:
-          fetch — download prebuilt iOS core (faster)
-          build — compile Rust core on the runner (slow, costly)
+          build — compile Rust core from this repo (matches app; slower, ~20–30m)
+          fetch — download prebuilt develop zip (FAST but often API-breaks the app)
         type: choice
         options:
-          - fetch
           - build
-        default: fetch
+          - fetch
+        default: build
       signed:
         description: "Archive/sign for device (requires Apple secrets). Off = simulator smoke build."
         type: boolean
         default: false
-
+      # NOTE: prefer core_source=build. fetch=develop has repeatedly broken Account/Gateway/Subscription types.
 env:
   CARGO_TERM_COLOR: always
   RUST_VERSION: "1.95"

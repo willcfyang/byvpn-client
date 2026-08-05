@@ -1,7 +1,7 @@
 name: upload-byvpn-ios-ipa
 
 # Upload an existing App Store IPA artifact to App Store Connect / TestFlight.
-# Requires APP_STORE_CONNECT_API_{KEY,ISSUER_ID,PRIVATE_KEY} secrets.
+# Prefer signed builds via build-byvpn-ios (auto-uploads). This workflow is for re-upload only.
 
 on:
   workflow_dispatch:

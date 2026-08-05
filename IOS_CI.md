@@ -43,7 +43,7 @@ Required when `signed=true`:
 | `BUILD_PROVISION_PROFILE_BASE64` | App Store profile for `com.byvpn.app` |
 | `BUILD_PROVISION_PROFILE_TUNNEL_BASE64` | App Store profile for `com.byvpn.app.tunnel` |
 
-Optional later (TestFlight / ASC automation):
+Optional later (TestFlight / ASC automation) — **required for signed builds** (auto-upload after IPA):
 
 | Secret | Purpose |
 |--------|---------|
@@ -51,7 +51,8 @@ Optional later (TestFlight / ASC automation):
 | `APP_STORE_CONNECT_API_ISSUER_ID` | Issuer UUID |
 | `APP_STORE_CONNECT_API_PRIVATE_KEY` | `.p8` PEM body |
 
-To upload an already-built IPA without rebuilding: **Actions → upload-byvpn-ios-ipa**, set `source_run_id` to the successful signed build run (e.g. `30876573932`). Requires the three ASC secrets above and an App Store Connect app record for `com.byvpn.app`.
+With `signed=true`, **build-byvpn-ios** archives then **uploads to TestFlight automatically**.  
+Manual re-upload of an old artifact only: **Actions → upload-byvpn-ios-ipa** (`source_run_id`).
 
 Encode profiles/certs:
 

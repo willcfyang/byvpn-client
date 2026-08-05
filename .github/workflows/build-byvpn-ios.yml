@@ -297,7 +297,7 @@ jobs:
             -exportPath "$RUNNER_TEMP/export" \
             -exportOptionsPlist "$EXPORT_PLIST"
 
-      - name: Upload IPA
+      - name: Upload IPA artifact
         if: ${{ inputs.signed == true }}
         uses: actions/upload-artifact@v4
         with:
@@ -305,3 +305,55 @@ jobs:
           path: ${{ runner.temp }}/export/*.ipa
           if-no-files-found: error
           retention-days: 14
+
+      # Auto-push to App Store Connect / TestFlight (same job — no separate manual workflow).
+      - name: Write App Store Connect API key
+        if: ${{ inputs.signed == true }}
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for v in ASC_PRIVATE_KEY ASC_KEY_ID; do
+            if [[ -z "${!v:-}" ]]; then
+              echo "Missing secret for ASC upload: $v"
+              missing=1
+            fi
+          done
+          [[ "$missing" -eq 0 ]]
+          for d in "$HOME/private_keys" "$HOME/.appstoreconnect/private_keys"; do
+            mkdir -p "$d"
+            printf '%s\n' "$ASC_PRIVATE_KEY" > "$d/AuthKey_${ASC_KEY_ID}.p8"
+            chmod 600 "$d/AuthKey_${ASC_KEY_ID}.p8"
+          done
+
+      - name: Upload IPA to TestFlight (ASC)
+        if: ${{ inputs.signed == true }}
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          IPA=$(find "$RUNNER_TEMP/export" -name '*.ipa' | head -1)
+          if [[ -z "$IPA" ]]; then
+            echo "::error::No .ipa under $RUNNER_TEMP/export"
+            ls -la "$RUNNER_TEMP/export" || true
+            exit 1
+          fi
+          echo "Uploading $IPA to App Store Connect / TestFlight…"
+          if xcrun altool --upload-app \
+              --type ios \
+              --file "$IPA" \
+              --apiKey "$ASC_KEY_ID" \
+              --apiIssuer "$ASC_ISSUER_ID" \
+              --show-progress; then
+            echo "Upload succeeded via altool"
+            exit 0
+          fi
+          echo "altool failed; trying iTMSTransporter…"
+          xcrun iTMSTransporter -m upload \
+            -assetFile "$IPA" \
+            -apiKey "$ASC_KEY_ID" \
+            -apiIssuer "$ASC_ISSUER_ID" \
+            -v informational

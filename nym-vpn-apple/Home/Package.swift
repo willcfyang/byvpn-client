@@ -43,6 +43,7 @@ let package = Package(
                 .product(name: "ExternalLinkManager", package: "Services"),
                 .product(name: "GatewayManager", package: "Services"),
                 .product(name: "ImpactGenerator", package: "Services"),
+                .product(name: "Billing", package: "Services"),
                 .product(name: "NetworkMonitor", package: "Services"),
                 .product(name: "GRPCManager", package: "ServicesMacOS", condition: .when(platforms: [.macOS])),
                 .product(name: "Routes", package: "Routes"),

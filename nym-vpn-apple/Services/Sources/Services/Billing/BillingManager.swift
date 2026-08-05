@@ -18,6 +18,23 @@ public final class BillingManager: ObservableObject {
     public init(service: (any BillingService)? = nil) {
         self.service = service ?? Self.makeDefaultService()
         preferredChannel = LabMock.isEnabled ? .mock : .alipay
+        // Lab/demo: seed Figma catalog immediately so Select Plan is never empty.
+        if LabMock.isEnabled {
+            plans = MockBillingService.catalog
+            plansLoaded = true
+        }
+    }
+
+    public var hasActiveEntitlement: Bool {
+        guard let entitlement else { return false }
+        return entitlement.isActive && entitlement.validUntil > Date()
+    }
+
+    public var entitlementValidUntilText: String? {
+        guard hasActiveEntitlement, let entitlement else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy.MM.dd HH:mm:ss"
+        return formatter.string(from: entitlement.validUntil)
     }
 
     /// Swap implementation without rewriting UI (e.g. after backend ships).
@@ -36,37 +53,50 @@ public final class BillingManager: ObservableObject {
         defer { isLoadingPlans = false }
         do {
             let fetched = try await service.fetchPlans()
-            plans = fetched
-            plansLoaded = !fetched.isEmpty
+            plans = fetched.isEmpty ? MockBillingService.catalog : fetched
+            plansLoaded = true
         } catch {
             print("BillingManager.loadPlans: \(error)")
-            // Demo safety net: always show Figma catalog if remote fails.
             plans = MockBillingService.catalog
             plansLoaded = true
         }
     }
 
     public func refreshEntitlement(accountId: String) async {
-        guard !accountId.isEmpty else {
-            entitlement = nil
-            return
-        }
+        let id = accountId.isEmpty ? "lab-local" : accountId
         do {
-            entitlement = try await service.fetchEntitlement(accountId: accountId)
+            entitlement = try await service.fetchEntitlement(accountId: id)
         } catch {
             print("BillingManager.refreshEntitlement: \(error)")
         }
     }
 
-    /// Demo purchase (create + confirm). Alipay should use `createPayment` → SDK → `confirmPayment`.
+    /// Mock / demo purchase — never fail for known catalog plan IDs.
     public func purchase(planId: String, accountId: String) async throws -> BillingEntitlement {
-        let result = try await service.purchase(
-            planId: planId,
-            accountId: accountId,
-            channel: .mock
-        )
-        entitlement = result
-        return result
+        let id = accountId.isEmpty ? "lab-local" : accountId
+        do {
+            let result = try await service.purchase(
+                planId: planId,
+                accountId: id,
+                channel: .mock
+            )
+            entitlement = result
+            return result
+        } catch {
+            // Demo safety: grant via mock catalog so TF / Lab always succeeds.
+            guard LabMock.isEnabled || preferredChannel == .mock,
+                  (plans + MockBillingService.catalog).contains(where: { $0.id == planId })
+            else {
+                throw error
+            }
+            let result = try await MockBillingService.shared.purchase(
+                planId: planId,
+                accountId: id,
+                channel: .mock
+            )
+            entitlement = result
+            return result
+        }
     }
 
     /// Future Alipay path: create order → hand `checkoutPayload` to Alipay SDK → confirm.

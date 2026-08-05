@@ -37112,7 +37112,7 @@
         }
       }
     },
-        "byvpn.plan.mockHint": {
+    "byvpn.plan.mockHint": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -37128,7 +37128,7 @@
         }
       }
     },
-"byvpn.mnemonic.reveal.title": {
+    "byvpn.mnemonic.reveal.title": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -37396,6 +37396,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "隐藏密码"
+          }
+        }
+      }
+    },
+    "byvpn.plan.needPlan.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Premium required"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要开通会员"
+          }
+        }
+      }
+    },
+    "byvpn.plan.needPlan.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a plan to connect. Demo billing always succeeds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接前请先选择套餐。当前为演示计费，选择后会自动开通成功。"
+          }
+        }
+      }
+    },
+    "byvpn.plan.needPlan.cta": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a plan"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "去选套餐"
+          }
+        }
+      }
+    },
+    "byvpn.plan.success.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan activated"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套餐已开通"
+          }
+        }
+      }
+    },
+    "byvpn.plan.success.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valid until %@ (demo)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有效期至 %@（演示开通成功）。"
           }
         }
       }

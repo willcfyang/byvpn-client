@@ -13,6 +13,7 @@ import GRPCManager
 import ImpactGenerator
 #if os(iOS)
 import PurchasesManager
+import Billing
 #endif
 import Routes
 import Settings
@@ -30,6 +31,7 @@ public struct AppFeatureView: View {
     @EnvironmentObject private var impactGenerator: ImpactGenerator
 #if os(iOS)
     @EnvironmentObject private var purchasesManager: PurchasesManager
+    @EnvironmentObject private var billingManager: BillingManager
 #elseif os(macOS)
     @EnvironmentObject private var grpcManager: GRPCManager
 #endif
@@ -46,6 +48,7 @@ public struct AppFeatureView: View {
     @State private var homePath = NavigationPath()
     @State private var nodesPath = NavigationPath()
     @State private var settingsPath = NavigationPath()
+    @State private var showNeedPlanAlert = false
 
     public init(viewModel: AppFeatureViewModel) {
         _viewModel = State(wrappedValue: viewModel)
@@ -63,9 +66,40 @@ public struct AppFeatureView: View {
         }
         .byVpnSnackbar(manager: viewModel.snackbarManager)
         .preferredColorScheme(appearance.colorScheme)
-        .onAppear { wireOneClickNavigation() }
+        .onAppear {
+            wireOneClickNavigation()
+#if os(iOS)
+            Task {
+                await billingManager.refreshEntitlement(
+                    accountId: credentialsManager.accountIdentifier
+                        ?? credentialsManager.accountToken
+                        ?? "lab-local"
+                )
+            }
+#endif
+        }
+#if os(iOS)
+        .alert(
+            "byvpn.plan.needPlan.title".localizedString,
+            isPresented: $showNeedPlanAlert
+        ) {
+            Button("byvpn.plan.needPlan.cta".localizedString) {
+                openSelectPlan()
+            }
+            Button("cancel".localizedString, role: .cancel) {}
+        } message: {
+            Text("byvpn.plan.needPlan.message".localizedString)
+        }
+        .onChange(of: billingManager.entitlement?.orderId) { _, _ in
+            viewModel.oneClick.refreshSubscriptionGate()
+        }
+        .onChange(of: billingManager.hasActiveEntitlement) { _, _ in
+            viewModel.oneClick.refreshSubscriptionGate()
+        }
+#endif
         .onChange(of: isCredentialImported) { _, newValue in
             viewModel.handleCredentialChange(imported: newValue)
+            wireOneClickNavigation()
             if !newValue {
                 selectedTab = .home
                 homePath = NavigationPath()
@@ -110,8 +144,12 @@ private extension AppFeatureView {
                     viewModel: viewModel.oneClick,
                     onOpenNodes: { selectedTab = .nodes },
                     onOpenPremium: {
+#if os(iOS)
+                        openSelectPlan()
+#else
                         selectedTab = .settings
                         settingsPath.append(SettingLink.selectPlan)
+#endif
                     }
                 )
                 .navigationDestination(for: HomeLink.self) { link in
@@ -156,12 +194,27 @@ private extension AppFeatureView {
     }
 
     func wireOneClickNavigation() {
-        let pushPlanPurchase: () -> Void = {
+#if os(iOS)
+        viewModel.oneClick.isSubscriptionSatisfied = { [billingManager, credentialsManager] in
+            credentialsManager.isAccountActive() || billingManager.hasActiveEntitlement
+        }
+        viewModel.oneClick.onRequestPlanPurchase = {
+            showNeedPlanAlert = true
+        }
+        viewModel.onRequestPlanPurchase = {
+            showNeedPlanAlert = true
+        }
+        viewModel.oneClick.refreshSubscriptionGate()
+#else
+        viewModel.oneClick.onRequestPlanPurchase = {
             selectedTab = .settings
             settingsPath.append(SettingLink.selectPlan)
         }
-        viewModel.oneClick.onRequestPlanPurchase = pushPlanPurchase
-        viewModel.onRequestPlanPurchase = pushPlanPurchase
+        viewModel.onRequestPlanPurchase = {
+            selectedTab = .settings
+            settingsPath.append(SettingLink.selectPlan)
+        }
+#endif
 #if os(macOS)
         viewModel.oneClick.onRequestDaemonEnable = {
             selectedTab = .settings
@@ -169,6 +222,19 @@ private extension AppFeatureView {
         }
 #endif
     }
+
+#if os(iOS)
+    func openSelectPlan() {
+        selectedTab = .settings
+        Task { @MainActor in
+            // Wait for Settings NavigationStack to become active (tab race).
+            try? await Task.sleep(for: .milliseconds(200))
+            settingsPath = NavigationPath()
+            try? await Task.sleep(for: .milliseconds(50))
+            settingsPath.append(SettingLink.selectPlan)
+        }
+    }
+#endif
 
     @ViewBuilder
     func homeLinkDestination(_ link: HomeLink, path: Binding<NavigationPath>) -> some View {

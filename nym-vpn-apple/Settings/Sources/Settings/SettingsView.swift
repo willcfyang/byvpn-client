@@ -1,14 +1,21 @@
 import SwiftUI
 import AppSettings
 import ConnectionTypes
+import Constants
 import CredentialsManager
 import Device
 import ConfigurationManager
 import UIComponents
 import Theme
+#if os(iOS)
+import Billing
+#endif
 
 public struct SettingsView: View {
     @EnvironmentObject private var credentialsManager: CredentialsManager
+#if os(iOS)
+    @EnvironmentObject private var billingManager: BillingManager
+#endif
     @StateObject private var viewModel: SettingsViewModel
 #if os(macOS)
     @State private var autologinState = AutologinState()
@@ -63,7 +70,10 @@ private extension SettingsView {
             viewModel.autologinState = autologinState
 #endif
             Task {
-                await credentialsManager.updateAccountSummary()
+                // Lab/TF: skip remote get_account (retries hang Settings for ~20s).
+                if !LabMock.isEnabled {
+                    await credentialsManager.updateAccountSummary()
+                }
                 viewModel.reloadSections()
             }
         }
@@ -99,11 +109,11 @@ private extension SettingsView {
                 Image(systemName: "crown.fill")
                     .foregroundStyle(Color.yellow)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("byvpn.premium.banner.title".localizedString)
+                    Text(premiumBannerTitle)
                         .byVpnTextStyle(.bodyDefault)
                         .foregroundStyle(Color.white)
                         .multilineTextAlignment(.leading)
-                    Text("byvpn.premium.banner.subtitle".localizedString)
+                    Text(premiumBannerSubtitle)
                         .byVpnTextStyle(.bodySmall)
                         .foregroundStyle(Color.white.opacity(0.9))
                         .multilineTextAlignment(.leading)
@@ -118,6 +128,29 @@ private extension SettingsView {
         }
         .buttonStyle(.plain)
     }
+
+#if os(iOS)
+    var premiumBannerTitle: String {
+        billingManager.hasActiveEntitlement
+            ? "byvpn.plan.success.title".localizedString
+            : "byvpn.premium.banner.title".localizedString
+    }
+
+    var premiumBannerSubtitle: String {
+        if let until = billingManager.entitlementValidUntilText {
+            return String(format: "byvpn.plan.success.message".localizedString, until)
+        }
+        return "byvpn.premium.banner.subtitle".localizedString
+    }
+#else
+    var premiumBannerTitle: String {
+        "byvpn.premium.banner.title".localizedString
+    }
+
+    var premiumBannerSubtitle: String {
+        "byvpn.premium.banner.subtitle".localizedString
+    }
+#endif
 
     func appVersionText() -> some View {
         VStack(spacing: 0) {

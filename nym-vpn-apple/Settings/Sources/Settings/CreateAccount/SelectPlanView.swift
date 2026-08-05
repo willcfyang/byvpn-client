@@ -15,7 +15,9 @@ public struct SelectPlanView: View {
     @State private var selectedPlanID: String?
     @State private var isPurchasing = false
     @State private var alertTitle = ""
+    @State private var alertMessage = ""
     @State private var isAlertDisplayed = false
+    @State private var didPurchaseSucceed = false
 
     public init(path: Binding<NavigationPath>) {
         _path = path
@@ -38,14 +40,12 @@ public struct SelectPlanView: View {
                         .foregroundStyle(Color.ByVpn.textSecondary)
                         .padding(.top, ByVpnSpacing.large)
 
-                    if billingManager.isLoadingPlans && billingManager.plans.isEmpty {
+                    if billingManager.isLoadingPlans && displayPlans.isEmpty {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, ByVpnSpacing.section)
-                    } else if billingManager.plans.isEmpty {
-                        emptyProductsCard
                     } else {
-                        ForEach(billingManager.plans) { plan in
+                        ForEach(displayPlans) { plan in
                             planCard(for: plan)
                         }
                     }
@@ -61,11 +61,14 @@ public struct SelectPlanView: View {
                             ? "byvpn.plan.purchasing".localizedString
                             : "byvpn.plan.cta".localizedString,
                         style: .primary,
-                        isDisabled: selectedPlan == nil || isPurchasing
+                        isDisabled: isPurchasing
                     ) {
+                        if selectedPlan == nil {
+                            selectedPlanID = preferredPlanID
+                        }
                         purchaseSelected()
                     }
-                    .disabled(selectedPlan == nil || isPurchasing)
+                    .disabled(isPurchasing)
                     .padding(.bottom, ByVpnSpacing.section)
                 }
                 .padding(.horizontal, ByVpnSpacing.component)
@@ -76,51 +79,53 @@ public struct SelectPlanView: View {
         .navigationBarBackButtonHidden(true)
         .background { Color.ByVpn.background.ignoresSafeArea() }
         .alert(alertTitle, isPresented: $isAlertDisplayed) {
-            Button("ok".localizedString, role: .cancel) {}
+            Button("ok".localizedString, role: .cancel) {
+                if didPurchaseSucceed {
+                    didPurchaseSucceed = false
+                    navigateBack()
+                }
+            }
+        } message: {
+            if !alertMessage.isEmpty {
+                Text(alertMessage)
+            }
         }
         .task {
-            await billingManager.loadPlans()
             if selectedPlanID == nil {
                 selectedPlanID = preferredPlanID
             }
-            if let accountId = accountIdForBilling {
-                await billingManager.refreshEntitlement(accountId: accountId)
+            await billingManager.loadPlans(force: billingManager.plans.isEmpty)
+            if selectedPlanID == nil || !displayPlans.contains(where: { $0.id == selectedPlanID }) {
+                selectedPlanID = preferredPlanID
+            }
+            await billingManager.refreshEntitlement(accountId: accountIdForBilling)
+        }
+        .onAppear {
+            if selectedPlanID == nil {
+                selectedPlanID = preferredPlanID
             }
         }
     }
 }
 
 private extension SelectPlanView {
+    var displayPlans: [BillingPlan] {
+        billingManager.plans.isEmpty ? MockBillingService.catalog : billingManager.plans
+    }
+
     var selectedPlan: BillingPlan? {
-        billingManager.plans.first { $0.id == selectedPlanID }
+        displayPlans.first { $0.id == selectedPlanID }
     }
 
     var preferredPlanID: String? {
-        billingManager.plans.first { $0.period == .year }?.id
-            ?? billingManager.plans.first?.id
+        displayPlans.first { $0.period == .year }?.id
+            ?? displayPlans.first?.id
     }
 
-    var accountIdForBilling: String? {
+    var accountIdForBilling: String {
         if let id = credentialsManager.accountIdentifier, !id.isEmpty { return id }
         if let token = credentialsManager.accountToken, !token.isEmpty { return token }
         return "lab-local"
-    }
-
-    var emptyProductsCard: some View {
-        VStack(alignment: .leading, spacing: ByVpnSpacing.medium) {
-            Text("byvpn.plan.unavailable.title".localizedString)
-                .byVpnTextStyle(.bodyLarge)
-                .foregroundStyle(Color.ByVpn.textPrimary)
-            Text("byvpn.plan.unavailable.subtitle".localizedString)
-                .byVpnTextStyle(.bodyDefault)
-                .foregroundStyle(Color.ByVpn.textSecondary)
-        }
-        .padding(ByVpnSpacing.component)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.ByVpn.backgroundCard)
-        )
     }
 
     func planCard(for plan: BillingPlan) -> some View {
@@ -203,20 +208,28 @@ private extension SelectPlanView {
 
     func purchaseSelected() {
         guard let plan = selectedPlan else { return }
-        guard let accountId = accountIdForBilling else {
-            alertTitle = "accountToken.empty".localizedString
-            isAlertDisplayed = true
-            return
-        }
         isPurchasing = true
         ImpactGenerator.shared.impact()
         Task {
             defer { isPurchasing = false }
             do {
-                _ = try await billingManager.purchase(planId: plan.id, accountId: accountId)
-                path.append(SettingLink.processingAccount)
+                let entitlement = try await billingManager.purchase(
+                    planId: plan.id,
+                    accountId: accountIdForBilling
+                )
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy.MM.dd HH:mm:ss"
+                alertTitle = "byvpn.plan.success.title".localizedString
+                alertMessage = String(
+                    format: "byvpn.plan.success.message".localizedString,
+                    formatter.string(from: entitlement.validUntil)
+                )
+                didPurchaseSucceed = true
+                isAlertDisplayed = true
             } catch {
                 alertTitle = error.localizedDescription
+                alertMessage = ""
+                didPurchaseSucceed = false
                 isAlertDisplayed = true
             }
         }

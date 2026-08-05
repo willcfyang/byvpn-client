@@ -49,8 +49,10 @@ public final class OneClickViewModel {
 
     /// Invoked when the daemon reports `.inactiveSubscription` or when the
     /// pre-flight gate detects an expired account. Routes the user into the
-    /// purchase flow.
+    /// purchase flow (or shows a need-plan alert).
     @ObservationIgnored public var onRequestPlanPurchase: (() -> Void)?
+    /// Optional override: treat account as entitled (e.g. Lab mock billing).
+    @ObservationIgnored public var isSubscriptionSatisfied: (() -> Bool)?
     /// macOS only: invoked when a connect attempt is made while the helper
     /// daemon is not running, so the user can install/enable it.
     @ObservationIgnored public var onRequestDaemonEnable: (() -> Void)?
@@ -114,9 +116,21 @@ public final class OneClickViewModel {
     }
 #endif
 
+    /// Re-evaluate connect / noSubscription after billing entitlement changes.
+    public func refreshSubscriptionGate() {
+        recomputeConnectState()
+    }
+
     func connectButtonTapped() {
         guard !isConnectDisconnectInFlight else { return }
         guard connectionManager.currentTunnelStatus != .disconnecting else { return }
+
+        // Immediate prompt when UI already shows "need plan" (avoid any async delay).
+        if connectState == .noSubscription {
+            impactGenerator.impact()
+            onRequestPlanPurchase?()
+            return
+        }
 
         impactGenerator.impact()
         snackbarManager.clear()
@@ -143,12 +157,13 @@ public final class OneClickViewModel {
                 }
 #endif
                 guard credentialsManager.isValidCredentialImported else { return }
-                if await !credentialsManager.isAccountValid() {
-                    await credentialsManager.updateAccountSummary()
-                    if !credentialsManager.isAccountActive() {
-                        onRequestPlanPurchase?()
-                        return
-                    }
+                // Local gate only — do not await remote get_account (Lab/TF can hang ~20s).
+                // VPN backend active OR mock/own billing entitlement both unlock connect.
+                let entitled = credentialsManager.isAccountActive()
+                    || (isSubscriptionSatisfied?() == true)
+                if !entitled {
+                    onRequestPlanPurchase?()
+                    return
                 }
             }
 
@@ -287,7 +302,9 @@ private extension OneClickViewModel {
                 return .noInternet
             }
 #endif
-            if credentialsManager.isValidCredentialImported, !credentialsManager.isAccountActive() {
+            if credentialsManager.isValidCredentialImported,
+               !credentialsManager.isAccountActive(),
+               isSubscriptionSatisfied?() != true {
                 return .noSubscription
             }
             return .disconnected

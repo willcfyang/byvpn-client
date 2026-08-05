@@ -165,8 +165,9 @@ jobs:
             -workspace ByVPN.xcworkspace \
             -scheme ByVPN
 
-      - name: Simulator smoke build (unsigned)
-        if: ${{ inputs.signed != true }}
+      # Always compile without packaging first (even for signed TF).
+      # Catches UniFFI/Swift errors before burning time on certs + archive/export.
+      - name: Compile check (unsigned, no package)
         run: |
           set -euo pipefail
           set -o pipefail
@@ -175,7 +176,7 @@ jobs:
             -scheme ByVPN \
             -configuration Debug \
             -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData-smoke" \
             CODE_SIGNING_ALLOWED=NO \
             build
 

@@ -118,7 +118,7 @@ jobs:
 
       - name: Install Go (wireguard-go / core build)
         if: ${{ inputs.core_source == 'build' }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           cache-dependency-path: wireguard/libwg/go.sum

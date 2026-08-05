@@ -39,4 +39,19 @@ public enum LabMock {
         }
         return defaultAuthBaseURL
     }
+
+    /// Future own-billing API root (Alipay orders / entitlements). Nil → use `MockBillingService`.
+    public static var billingBaseURL: String? {
+        if let override = ProcessInfo.processInfo.environment["NYM_VPN_APP_LAB_BILLING_BASE_URL"],
+           !override.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return override.trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        }
+        if let plist = Bundle.main.object(forInfoDictionaryKey: "LabBillingBaseURL") as? String,
+           !plist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return plist.trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        }
+        return nil
+    }
 }

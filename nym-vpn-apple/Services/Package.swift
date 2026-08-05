@@ -30,6 +30,7 @@ let package = Package(
         .library(name: "NotificationMessages", targets: ["NotificationMessages"]),
         .library(name: "PathManager", targets: ["PathManager"]),
         .library(name: "PurchasesManager", targets: ["PurchasesManager"]),
+        .library(name: "Billing", targets: ["Billing"]),
         .library(name: "SentryManager", targets: ["SentryManager"]),
         .library(name: "Tunnels", targets: ["Tunnels"]),
         .library(name: "TunnelMixnet", targets: ["TunnelMixnet"])
@@ -212,6 +213,13 @@ let package = Package(
                 "AppSettings"
             ],
             path: "Sources/Services/PurchasesManager"
+        ),
+        .target(
+            name: "Billing",
+            dependencies: [
+                .product(name: "Constants", package: "ServicesMutual")
+            ],
+            path: "Sources/Services/Billing"
         ),
         .target(
             name: "SentryManager",

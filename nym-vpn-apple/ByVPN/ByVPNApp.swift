@@ -17,6 +17,7 @@ import Migrations
 import ByVpnLogger
 import NotificationsManager
 import PurchasesManager
+import Billing
 import SentryManager
 import Theme
 #if os(iOS)
@@ -49,6 +50,7 @@ struct ByVPNApp: App {
     @ObservedObject private var gatewayManager = GatewayManager.shared
     @ObservedObject private var impactGenerator = ImpactGenerator.shared
     @ObservedObject private var purchasesManager = PurchasesManager()
+    @ObservedObject private var billingManager = BillingManager.shared
     @State private var deeplinkManager = DeeplinkManager(
         credentialsManager: CredentialsManager.shared,
         connectionManager: ConnectionManager.shared
@@ -113,6 +115,7 @@ struct ByVPNApp: App {
             .environmentObject(KeyboardManager.shared)
             .environmentObject(logFileManager)
             .environmentObject(purchasesManager)
+            .environmentObject(billingManager)
             .environment(deeplinkManager)
         }
     }

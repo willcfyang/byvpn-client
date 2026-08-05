@@ -1,19 +1,18 @@
 #if os(iOS)
 import SwiftUI
-import StoreKit
+import Billing
 import CredentialsManager
 import ImpactGenerator
-import PurchasesManager
 import Theme
 import UIComponents
 
-/// Figma-style Select a plan screen with month / year cards.
+/// Figma-style Select a plan — backed by own billing (`BillingManager`), mock for demo / Alipay later.
 public struct SelectPlanView: View {
     @Binding private var path: NavigationPath
-    @EnvironmentObject private var purchasesManager: PurchasesManager
+    @EnvironmentObject private var billingManager: BillingManager
     @EnvironmentObject private var credentialsManager: CredentialsManager
 
-    @State private var selectedProductID: String?
+    @State private var selectedPlanID: String?
     @State private var isPurchasing = false
     @State private var alertTitle = ""
     @State private var isAlertDisplayed = false
@@ -39,26 +38,34 @@ public struct SelectPlanView: View {
                         .foregroundStyle(Color.ByVpn.textSecondary)
                         .padding(.top, ByVpnSpacing.large)
 
-                    if purchasesManager.products.isEmpty {
+                    if billingManager.isLoadingPlans && billingManager.plans.isEmpty {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, ByVpnSpacing.section)
+                    } else if billingManager.plans.isEmpty {
                         emptyProductsCard
                     } else {
-                        ForEach(purchasesManager.products, id: \.id) { product in
-                            planCard(for: product)
+                        ForEach(billingManager.plans) { plan in
+                            planCard(for: plan)
                         }
                     }
 
                     benefits
+                    Text("byvpn.plan.mockHint".localizedString)
+                        .byVpnTextStyle(.bodySmall)
+                        .foregroundStyle(Color.ByVpn.textSecondary)
+                        .padding(.top, ByVpnSpacing.medium)
                     Spacer(minLength: ByVpnSpacing.section)
                     ByVpnButton(
                         isPurchasing
                             ? "byvpn.plan.purchasing".localizedString
                             : "byvpn.plan.cta".localizedString,
                         style: .primary,
-                        isDisabled: selectedProduct == nil || isPurchasing
+                        isDisabled: selectedPlan == nil || isPurchasing
                     ) {
                         purchaseSelected()
                     }
-                    .disabled(selectedProduct == nil || isPurchasing)
+                    .disabled(selectedPlan == nil || isPurchasing)
                     .padding(.bottom, ByVpnSpacing.section)
                 }
                 .padding(.horizontal, ByVpnSpacing.component)
@@ -72,23 +79,31 @@ public struct SelectPlanView: View {
             Button("ok".localizedString, role: .cancel) {}
         }
         .task {
-            if selectedProductID == nil {
-                selectedProductID = preferredProductID
+            await billingManager.loadPlans()
+            if selectedPlanID == nil {
+                selectedPlanID = preferredPlanID
+            }
+            if let accountId = accountIdForBilling {
+                await billingManager.refreshEntitlement(accountId: accountId)
             }
         }
     }
 }
 
 private extension SelectPlanView {
-    var selectedProduct: Product? {
-        purchasesManager.products.first { $0.id == selectedProductID }
+    var selectedPlan: BillingPlan? {
+        billingManager.plans.first { $0.id == selectedPlanID }
     }
 
-    var preferredProductID: String? {
-        let yearly = purchasesManager.products.first {
-            $0.subscription?.subscriptionPeriod.unit == .year
-        }
-        return yearly?.id ?? purchasesManager.products.first?.id
+    var preferredPlanID: String? {
+        billingManager.plans.first { $0.period == .year }?.id
+            ?? billingManager.plans.first?.id
+    }
+
+    var accountIdForBilling: String? {
+        if let id = credentialsManager.accountIdentifier, !id.isEmpty { return id }
+        if let token = credentialsManager.accountToken, !token.isEmpty { return token }
+        return "lab-local"
     }
 
     var emptyProductsCard: some View {
@@ -108,22 +123,27 @@ private extension SelectPlanView {
         )
     }
 
-    func planCard(for product: Product) -> some View {
-        let isSelected = product.id == selectedProductID
+    func planCard(for plan: BillingPlan) -> some View {
+        let isSelected = plan.id == selectedPlanID
         return Button {
             ImpactGenerator.shared.softImpact()
-            selectedProductID = product.id
+            selectedPlanID = plan.id
         } label: {
             HStack(alignment: .top, spacing: ByVpnSpacing.medium) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(periodTitle(for: product))
+                    Text(periodTitle(for: plan))
                         .byVpnTextStyle(.bodyLarge)
                         .foregroundStyle(Color.ByVpn.textPrimary)
-                    Text(product.displayPrice)
+                    Text(plan.displayPrice)
                         .byVpnTextStyle(.titleScreen)
                         .foregroundStyle(Color.ByVpn.primary)
-                    if let offer = introOfferText(for: product) {
-                        Text(offer)
+                    if let days = plan.introOfferDays, days > 0 {
+                        Text("purchasePlan.7dayFreeTrial".localizedString)
+                            .byVpnTextStyle(.bodySmall)
+                            .foregroundStyle(Color.ByVpn.textSecondary)
+                    }
+                    if let description = plan.description {
+                        Text(description)
                             .byVpnTextStyle(.bodySmall)
                             .foregroundStyle(Color.ByVpn.textSecondary)
                     }
@@ -167,25 +187,13 @@ private extension SelectPlanView {
         }
     }
 
-    func periodTitle(for product: Product) -> String {
-        switch product.subscription?.subscriptionPeriod.unit {
+    func periodTitle(for plan: BillingPlan) -> String {
+        switch plan.period {
         case .year:
             return "byvpn.plan.yearly".localizedString
         case .month:
             return "byvpn.plan.monthly".localizedString
-        default:
-            return product.displayName
         }
-    }
-
-    func introOfferText(for product: Product) -> String? {
-        guard purchasesManager.isEligibleForIntroOffer.contains(product.id),
-              let offer = product.subscription?.introductoryOffer
-        else { return nil }
-        if offer.price == 0 {
-            return "purchasePlan.7dayFreeTrial".localizedString
-        }
-        return "\(offer.displayPrice)"
     }
 
     func navigateBack() {
@@ -194,8 +202,8 @@ private extension SelectPlanView {
     }
 
     func purchaseSelected() {
-        guard let product = selectedProduct else { return }
-        guard let token = credentialsManager.accountToken, !token.isEmpty else {
+        guard let plan = selectedPlan else { return }
+        guard let accountId = accountIdForBilling else {
             alertTitle = "accountToken.empty".localizedString
             isAlertDisplayed = true
             return
@@ -205,8 +213,7 @@ private extension SelectPlanView {
         Task {
             defer { isPurchasing = false }
             do {
-                let ok = try await purchasesManager.purchase(with: product, token: token)
-                guard ok else { return }
+                _ = try await billingManager.purchase(planId: plan.id, accountId: accountId)
                 path.append(SettingLink.processingAccount)
             } catch {
                 alertTitle = error.localizedDescription

@@ -37021,13 +37021,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Continue"
+            "value": "Choose a Plan"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "继续"
+            "value": "选择套餐"
           }
         }
       }
@@ -37101,18 +37101,34 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Store products are not available on this build. You can still explore the app."
+            "value": "Plans could not be loaded. Pull to retry or try again later."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "当前构建无法加载商店商品，仍可继续使用应用。"
+            "value": "暂时无法加载套餐，请稍后重试。"
           }
         }
       }
     },
-    "byvpn.mnemonic.reveal.title": {
+        "byvpn.plan.mockHint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demo billing (mock). Alipay will use the same billing API later."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前为演示计费（Mock），后续支付宝走同一套 Billing 接口。"
+          }
+        }
+      }
+    },
+"byvpn.mnemonic.reveal.title": {
       "localizations": {
         "en": {
           "stringUnit": {

@@ -39,6 +39,7 @@
 		D93551F22F4CED0C007AFE9D /* UINavigationController+SwipeBack.swift in Sources */ = {isa = PBXBuildFile; fileRef = D93551F12F4CED0C007AFE9D /* UINavigationController+SwipeBack.swift */; };
 		D93551F42F508D0A007AFE9D /* AppDiscoveryService in Frameworks */ = {isa = PBXBuildFile; productRef = D93551F32F508D0A007AFE9D /* AppDiscoveryService */; };
 		D939CB652DE0911500AA2F9C /* PurchasesManager in Frameworks */ = {isa = PBXBuildFile; productRef = D939CB642DE0911500AA2F9C /* PurchasesManager */; };
+		B1LL00012F00000100B1LL01 /* Billing in Frameworks */ = {isa = PBXBuildFile; productRef = B1LL00022F00000100B1LL01 /* Billing */; };
 		D944053F2BAC4CBD0076EEDB /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D9CF05D82BA1CC7100489055 /* SystemConfiguration.framework */; };
 		D94510932F104CD200E2EE5E /* Routes in Frameworks */ = {isa = PBXBuildFile; productRef = D94510922F104CD200E2EE5E /* Routes */; };
 		D94510952F104CD800E2EE5E /* Routes in Frameworks */ = {isa = PBXBuildFile; productRef = D94510942F104CD800E2EE5E /* Routes */; };
@@ -381,6 +382,7 @@
 				D99A148C2B35A74200F2728B /* Theme in Frameworks */,
 				D94867012BE035FB00F5331B /* Constants in Frameworks */,
 				D939CB652DE0911500AA2F9C /* PurchasesManager in Frameworks */,
+				B1LL00012F00000100B1LL01 /* Billing in Frameworks */,
 				D9B7BAFC2C4866AF005AF2D6 /* ByVpnLogger in Frameworks */,
 				D953CFEA2C8ED73C008A942B /* NotificationsManager in Frameworks */,
 				D9F59A3E2F1E76E900CAE857 /* DeeplinkManager in Frameworks */,
@@ -754,6 +756,7 @@
 				D98E52302D4005ED00AE92C3 /* ErrorReason */,
 				D9BA3B6E2D5BF65700A5B99A /* GatewayManager */,
 				D939CB642DE0911500AA2F9C /* PurchasesManager */,
+				B1LL00022F00000100B1LL01 /* Billing */,
 				D93466CC2E57A1FE00BEF458 /* ByVpnCore */,
 				D9D381322E7B1683006DAFBB /* FeatureFlagsManager */,
 				D94510922F104CD200E2EE5E /* Routes */,
@@ -1250,7 +1253,7 @@
 				CODE_SIGN_ENTITLEMENTS = ByVPNTunnel/ByVPNTunnel.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 438;
+				CURRENT_PROJECT_VERSION = 439;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -1288,7 +1291,7 @@
 				CODE_SIGN_ENTITLEMENTS = ByVPNTunnel/ByVPNTunnel.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 438;
+				CURRENT_PROJECT_VERSION = 439;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -1452,7 +1455,7 @@
 				CODE_SIGN_ENTITLEMENTS = ByVPN/ByVPN.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 438;
+				CURRENT_PROJECT_VERSION = 439;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
@@ -1492,7 +1495,7 @@
 				CODE_SIGN_ENTITLEMENTS = ByVPN/ByVPN.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 438;
+				CURRENT_PROJECT_VERSION = 439;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = YES;
@@ -2013,6 +2016,10 @@
 		D939CB642DE0911500AA2F9C /* PurchasesManager */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PurchasesManager;
+		};
+		B1LL00022F00000100B1LL01 /* Billing */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Billing;
 		};
 		D94510922F104CD200E2EE5E /* Routes */ = {
 			isa = XCSwiftPackageProductDependency;

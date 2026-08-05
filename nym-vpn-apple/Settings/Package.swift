@@ -45,6 +45,7 @@ let package = Package(
                 .product(name: "ImpactGenerator", package: "Services"),
                 .product(name: "KeyboardManager", package: "ServicesIOS", condition: .when(platforms: [.iOS])),
                 .product(name: "PurchasesManager", package: "Services"),
+                .product(name: "Billing", package: "Services"),
                 .product(name: "SentryManager", package: "Services"),
                 .product(name: "SnackbarManager", package: "Services"),
                 .product(name: "ByVpnLogger", package: "ServicesMutual"),

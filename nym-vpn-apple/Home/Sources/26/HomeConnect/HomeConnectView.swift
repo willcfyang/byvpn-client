@@ -9,7 +9,6 @@ public struct HomeConnectView: View {
     private let onOpenPremium: () -> Void
 
     @State private var connectedAt: Date?
-    @State private var pulse = false
 
     public init(
         viewModel: OneClickViewModel,
@@ -50,10 +49,6 @@ public struct HomeConnectView: View {
             } else if newValue == .disconnected || newValue == .noInternet || newValue == .noSubscription {
                 connectedAt = nil
             }
-            updatePulse(for: newValue)
-        }
-        .onAppear {
-            updatePulse(for: viewModel.connectState)
         }
     }
 }
@@ -153,35 +148,45 @@ private extension HomeConnectView {
         Button {
             viewModel.connectButtonTapped()
         } label: {
-            ZStack {
-                ForEach(0..<2, id: \.self) { index in
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isOrbBusy)) { context in
+                let t = context.date.timeIntervalSinceReferenceDate
+                let wave = isOrbBusy ? (0.5 + 0.5 * sin(t * 2.6)) : 0
+                ZStack {
+                    ForEach(0..<3, id: \.self) { index in
+                        let phase = Double(index) * 0.22
+                        let scale = 1.0 + wave * (0.18 + Double(index) * 0.08) + phase * wave
+                        Circle()
+                            .stroke(
+                                Color.ByVpn.primary.opacity(isOrbBusy ? (0.55 - Double(index) * 0.14) : 0.22),
+                                lineWidth: isOrbBusy ? 3 : 1.5
+                            )
+                            .frame(width: 168, height: 168)
+                            .scaleEffect(scale)
+                            .opacity(isOrbBusy ? (0.85 - Double(index) * 0.2) : 0.0)
+                    }
                     Circle()
-                        .stroke(Color.ByVpn.primary.opacity(0.35 - Double(index) * 0.12), lineWidth: 2)
+                        .fill(Color.ByVpn.primary.opacity(0.22 + wave * 0.12))
                         .frame(width: 168, height: 168)
-                        .scaleEffect(pulse ? 1.12 + CGFloat(index) * 0.1 : 1.0)
-                        .opacity(pulse ? 0.2 : (isOrbBusy ? 0.55 : 0.0))
-                }
-                Circle()
-                    .fill(Color.ByVpn.primary.opacity(0.2))
-                    .frame(width: 168, height: 168)
-                    .scaleEffect(pulse ? 1.06 : 1.0)
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [Color.ByVpn.primary, Color.ByVpn.primary.opacity(0.75)],
-                            center: .center,
-                            startRadius: 10,
-                            endRadius: 70
+                        .scaleEffect(isOrbBusy ? 1.0 + wave * 0.06 : 1.0)
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [Color.ByVpn.primary, Color.ByVpn.primary.opacity(0.75)],
+                                center: .center,
+                                startRadius: 10,
+                                endRadius: 70
+                            )
                         )
-                    )
-                    .frame(width: 132, height: 132)
-                    .shadow(color: Color.ByVpn.primary.opacity(0.45), radius: 24, y: 8)
-                Image(systemName: orbSymbol)
-                    .font(.system(size: 44, weight: .semibold))
-                    .foregroundStyle(Color.white)
-                    .symbolEffect(.pulse, isActive: isOrbBusy)
+                        .frame(width: 132, height: 132)
+                        .shadow(color: Color.ByVpn.primary.opacity(0.45 + wave * 0.25), radius: 24 + wave * 10, y: 8)
+                        .scaleEffect(isOrbBusy ? 1.0 + wave * 0.04 : 1.0)
+                    Image(systemName: orbSymbol)
+                        .font(.system(size: 44, weight: .semibold))
+                        .foregroundStyle(Color.white)
+                        .symbolEffect(.pulse, isActive: isOrbBusy)
+                }
+                .frame(width: 220, height: 220)
             }
-            .frame(width: 200, height: 200)
         }
         .buttonStyle(ConnectOrbButtonStyle())
         .accessibilityLabel(Text(orbAccessibility))
@@ -210,25 +215,6 @@ private extension HomeConnectView {
             return "byvpn.plan.needPlan.title".localizedString
         default:
             return ""
-        }
-    }
-
-    func updatePulse(for state: OneClickConnectState) {
-        let busy: Bool
-        switch state {
-        case .connecting, .disconnecting, .stop:
-            busy = true
-        default:
-            busy = false
-        }
-        if busy {
-            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
-                pulse = true
-            }
-        } else {
-            withAnimation(.easeOut(duration: 0.25)) {
-                pulse = false
-            }
         }
     }
 

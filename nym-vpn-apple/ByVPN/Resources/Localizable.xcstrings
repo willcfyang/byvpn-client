@@ -37479,6 +37479,22 @@
           }
         }
       }
+    },
+    "byvpn.connect.failed.generic": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not connect. Tap Connect to try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接失败。请再点一次连接重试。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

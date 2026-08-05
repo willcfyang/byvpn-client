@@ -143,9 +143,10 @@ extension ConnectionManager {
         guard let activeTunnel else { return false }
 
         switch activeTunnel.status {
-        case .connected, .connecting, .reasserting, .restarting, .offlineReconnect, .error:
+        case .connected, .connecting, .reasserting, .restarting, .offlineReconnect:
             return true
-        case .disconnecting, .disconnected, .offline, .unknown:
+        // `.error` must NOT disconnect-only — one tap should retry connect.
+        case .error, .disconnecting, .disconnected, .offline, .unknown:
             return false
         }
     }
@@ -164,6 +165,20 @@ extension ConnectionManager {
             let config = try generateConfig()
             try await connect(with: config)
         }
+    }
+
+    /// Clear a stuck `.error` tunnel so the next `connectDisconnect` starts a fresh connect.
+    @MainActor public func prepareForReconnect() async throws {
+        guard activeTunnel != nil else {
+            currentTunnelStatus = .disconnected
+            lastError = nil
+            return
+        }
+        isDisconnecting = true
+        try await disconnectActiveTunnel()
+        currentTunnelStatus = .disconnected
+        lastError = nil
+        isDisconnecting = false
     }
 }
 

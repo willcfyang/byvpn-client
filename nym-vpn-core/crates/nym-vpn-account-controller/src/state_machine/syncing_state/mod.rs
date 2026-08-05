@@ -9,7 +9,7 @@ use crate::{
     state_machine::{
         AccountControllerStateHandler, DecentralisedState, ErrorState, LoggedOutState,
         NextAccountControllerState, OfflineState, PendingSubscriptionState,
-        PrivateAccountControllerState,
+        PrivateAccountControllerState, ReadyState,
     },
 };
 use nym_offline_monitor::ConnectivityMonitor;
@@ -36,6 +36,18 @@ const SYNCING_STATE_CONTEXT: &str = "SYNCING_STATE";
 const RETRY_BACKOFF: Duration = Duration::from_millis(250);
 const MAX_BACKOFF_EXPONENT: u32 = 5;
 const BACKOFF_BASE: u32 = 2;
+
+fn is_lab_mock_env() -> bool {
+    let truthy = |key: &str| {
+        std::env::var(key)
+            .map(|v| {
+                let v = v.trim();
+                v == "1" || v.eq_ignore_ascii_case("true") || v.eq_ignore_ascii_case("yes")
+            })
+            .unwrap_or(false)
+    };
+    truthy("NYM_VPN_APP_LAB_MOCK") || truthy("NYM_VPN_LAB_SKIP_CONNECTION_PROBE")
+}
 
 enum SyncEvent {
     /// Account summary is received
@@ -85,6 +97,12 @@ impl SyncingState {
         };
         if vpn_api_account.mode().is_decentralised() {
             return DecentralisedState::enter();
+        }
+        // Lab / TF mock billing: app owns subscription UX; VPN-API has no real plan.
+        // Skip sync → zk-nym so connect is not blocked on InactiveSubscription.
+        if is_lab_mock_env() {
+            warn!("lab mock: skipping VPN-API account sync; entering ReadyToConnect");
+            return ReadyState::enter();
         }
         let Some(device) = shared_state.device.clone() else {
             return ErrorState::enter(AccountControllerErrorStateReason::Internal {
@@ -202,8 +220,23 @@ impl SyncingState {
             // subscription exists but is not yet active (e.g. cash payment still processing)
             Err(SyncError::PendingSubscription)
         } else if !summary.subscription_active() {
-            // that there is an active subscription
-            Err(SyncError::InactiveSubscription)
+            if is_lab_mock_env() {
+                warn!("lab mock: bypassing InactiveSubscription");
+                if summary.active_device.is_none() {
+                    if summary.remaining_devices() == 0 {
+                        Err(SyncError::MaxDeviceReached)
+                    } else if !vpn_account_summary.fair_usage_left() {
+                        Err(SyncError::FairUsageDepleted)
+                    } else {
+                        SyncingState::register_device(&vpn_api_client, vpn_api_account, device).await
+                    }
+                } else {
+                    Ok(())
+                }
+            } else {
+                // that there is an active subscription
+                Err(SyncError::InactiveSubscription)
+            }
         } else if summary.active_device.is_none() {
             // that the device is registered or there is a spot left for it with fair usage
             if summary.remaining_devices() == 0 {

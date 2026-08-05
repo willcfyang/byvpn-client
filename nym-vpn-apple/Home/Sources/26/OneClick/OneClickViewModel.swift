@@ -159,7 +159,6 @@ public final class OneClickViewModel {
                 }
 #endif
                 guard credentialsManager.isValidCredentialImported else { return }
-                // Prefer wired subscription check (Lab = mock billing only).
                 let entitled = isSubscriptionSatisfied.map { $0() }
                     ?? credentialsManager.isAccountActive()
                 if !entitled {
@@ -170,23 +169,44 @@ public final class OneClickViewModel {
                 recomputeConnectState()
             }
 
-            defer {
-                if forceConnectingUI {
-                    forceConnectingUI = false
-                    recomputeConnectState()
-                }
-            }
+            let startedAt = Date()
+            var didPresentError = false
 
             do {
+                // If previous attempt left `.error`, tear down so this tap retries connect.
+                if isConnectingTap,
+                   connectionManager.currentTunnelStatus == .error {
+#if os(iOS)
+                    try await connectionManager.prepareForReconnect()
+#endif
+                }
                 try await connectionManager.connectDisconnect()
             } catch {
                 impactGenerator.error()
                 presentConnectionErrorAlert(
                     message: ConnectionStatusViewModel.userFacingMessage(from: error)
                 )
+                didPresentError = true
             }
-            handleInactiveSubscriptionErrorIfNeeded()
-            clearLastErrorIfNeeded()
+
+            if isConnectingTap {
+                await waitForTunnelSettled(timeoutSeconds: 12)
+                let minPulse: TimeInterval = 2.0
+                let elapsed = Date().timeIntervalSince(startedAt)
+                if elapsed < minPulse {
+                    try? await Task.sleep(for: .seconds(minPulse - elapsed))
+                }
+
+                if !didPresentError {
+                    presentTunnelFailureIfNeeded()
+                }
+
+                forceConnectingUI = false
+                recomputeConnectState()
+            } else {
+                forceConnectingUI = false
+                recomputeConnectState()
+            }
         }
     }
 
@@ -352,6 +372,55 @@ private extension OneClickViewModel {
             return
         }
         onRequestPlanPurchase?()
+    }
+
+    func waitForTunnelSettled(timeoutSeconds: Double) async {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while Date() < deadline {
+            switch connectionManager.currentTunnelStatus {
+            case .connecting, .reasserting, .restarting, .offlineReconnect:
+                try? await Task.sleep(for: .milliseconds(200))
+            default:
+                return
+            }
+        }
+    }
+
+    func presentTunnelFailureIfNeeded() {
+        if connectionManager.currentTunnelStatus == .connected {
+            return
+        }
+
+        if let error = connectionManager.lastError {
+            let reason: ErrorReason?
+            if let typed = error as? ErrorReason {
+                reason = typed
+            } else {
+                let nsError = error as NSError
+                reason = nsError.domain == ErrorReason.domain ? ErrorReason(nsError: nsError) : nil
+            }
+            if reason == .inactiveSubscription, isSubscriptionSatisfied?() != true {
+                onRequestPlanPurchase?()
+                return
+            }
+            impactGenerator.error()
+            presentConnectionErrorAlert(
+                message: ConnectionStatusViewModel.userFacingMessage(from: error)
+            )
+            return
+        }
+
+        switch connectionManager.currentTunnelStatus {
+        case .connecting, .reasserting, .restarting, .offlineReconnect, .disconnecting:
+            return
+        case .error, .disconnected, .offline, .unknown:
+            impactGenerator.error()
+            presentConnectionErrorAlert(
+                message: "byvpn.connect.failed.generic".localizedString
+            )
+        default:
+            break
+        }
     }
 
     func clearLastErrorIfNeeded() {

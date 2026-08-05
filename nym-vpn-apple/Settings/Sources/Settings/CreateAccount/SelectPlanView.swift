@@ -1,5 +1,6 @@
 #if os(iOS)
 import SwiftUI
+import AppSettings
 import Billing
 import CredentialsManager
 import ImpactGenerator
@@ -123,9 +124,11 @@ private extension SelectPlanView {
     }
 
     var accountIdForBilling: String {
-        if let id = credentialsManager.accountIdentifier, !id.isEmpty { return id }
-        if let token = credentialsManager.accountToken, !token.isEmpty { return token }
-        return "lab-local"
+        BillingManager.accountId(
+            labUsername: AppSettings.shared.labUsername,
+            accountIdentifier: credentialsManager.accountIdentifier,
+            accountToken: credentialsManager.accountToken
+        )
     }
 
     func planCard(for plan: BillingPlan) -> some View {

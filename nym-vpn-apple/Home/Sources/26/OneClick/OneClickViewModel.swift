@@ -61,6 +61,8 @@ public final class OneClickViewModel {
     @ObservationIgnored private var resolveTask: Task<Void, Never>?
     @ObservationIgnored private var cancellables = Set<AnyCancellable>()
     @ObservationIgnored private var isConnectDisconnectInFlight = false
+    /// Shows connecting UI immediately on tap (tunnel status can lag).
+    @ObservationIgnored private var forceConnectingUI = false
 
 #if os(iOS)
     public init(
@@ -157,13 +159,21 @@ public final class OneClickViewModel {
                 }
 #endif
                 guard credentialsManager.isValidCredentialImported else { return }
-                // Local gate only — do not await remote get_account (Lab/TF can hang ~20s).
-                // VPN backend active OR mock/own billing entitlement both unlock connect.
-                let entitled = credentialsManager.isAccountActive()
-                    || (isSubscriptionSatisfied?() == true)
+                // Prefer wired subscription check (Lab = mock billing only).
+                let entitled = isSubscriptionSatisfied.map { $0() }
+                    ?? credentialsManager.isAccountActive()
                 if !entitled {
                     onRequestPlanPurchase?()
                     return
+                }
+                forceConnectingUI = true
+                recomputeConnectState()
+            }
+
+            defer {
+                if forceConnectingUI {
+                    forceConnectingUI = false
+                    recomputeConnectState()
                 }
             }
 
@@ -289,12 +299,25 @@ private extension OneClickViewModel {
     }
 
     func derivedConnectState() -> OneClickConnectState {
+        if forceConnectingUI {
+            switch connectionManager.currentTunnelStatus {
+            case .connected:
+                return .connected
+            case .disconnecting:
+                return .disconnecting
+            default:
+                return .connecting
+            }
+        }
+
         switch connectionManager.currentTunnelStatus {
         case .connected:
             return .connected
         case .disconnecting:
             return .disconnecting
-        case .connecting, .reasserting, .restarting, .offlineReconnect, .error:
+        case .connecting, .reasserting, .restarting, .offlineReconnect:
+            return .connecting
+        case .error:
             return .stop
         case .disconnected, .offline, .unknown:
 #if os(iOS)
@@ -302,10 +325,12 @@ private extension OneClickViewModel {
                 return .noInternet
             }
 #endif
-            if credentialsManager.isValidCredentialImported,
-               !credentialsManager.isAccountActive(),
-               isSubscriptionSatisfied?() != true {
-                return .noSubscription
+            if credentialsManager.isValidCredentialImported {
+                let entitled = isSubscriptionSatisfied.map { $0() }
+                    ?? credentialsManager.isAccountActive()
+                if !entitled {
+                    return .noSubscription
+                }
             }
             return .disconnected
         }
@@ -322,6 +347,10 @@ private extension OneClickViewModel {
             reason = nsError.domain == ErrorReason.domain ? ErrorReason(nsError: nsError) : nil
         }
         guard reason == .inactiveSubscription else { return }
+        // Lab mock billing can be active while VPN-API still reports inactive — don't loop plan alert.
+        if isSubscriptionSatisfied?() == true {
+            return
+        }
         onRequestPlanPurchase?()
     }
 

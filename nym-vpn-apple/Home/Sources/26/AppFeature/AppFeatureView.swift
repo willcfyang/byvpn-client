@@ -70,11 +70,19 @@ public struct AppFeatureView: View {
             wireOneClickNavigation()
 #if os(iOS)
             Task {
-                await billingManager.refreshEntitlement(
-                    accountId: credentialsManager.accountIdentifier
-                        ?? credentialsManager.accountToken
-                        ?? "lab-local"
-                )
+                if LabMock.isEnabled,
+                   (AppSettings.shared.labUsername ?? "").isEmpty {
+                    // Old sessions without per-user billing key: do not inherit shared lab-local purchase.
+                    billingManager.clearLocalEntitlement()
+                } else {
+                    let accountId = BillingManager.accountId(
+                        labUsername: AppSettings.shared.labUsername,
+                        accountIdentifier: credentialsManager.accountIdentifier,
+                        accountToken: credentialsManager.accountToken
+                    )
+                    await billingManager.refreshEntitlement(accountId: accountId)
+                }
+                viewModel.oneClick.refreshSubscriptionGate()
             }
 #endif
         }
@@ -101,10 +109,25 @@ public struct AppFeatureView: View {
             viewModel.handleCredentialChange(imported: newValue)
             wireOneClickNavigation()
             if !newValue {
+#if os(iOS)
+                billingManager.clearLocalEntitlement()
+#endif
                 selectedTab = .home
                 homePath = NavigationPath()
                 nodesPath = NavigationPath()
                 settingsPath = NavigationPath()
+            } else {
+#if os(iOS)
+                Task {
+                    let accountId = BillingManager.accountId(
+                        labUsername: AppSettings.shared.labUsername,
+                        accountIdentifier: credentialsManager.accountIdentifier,
+                        accountToken: credentialsManager.accountToken
+                    )
+                    await billingManager.refreshEntitlement(accountId: accountId)
+                    viewModel.oneClick.refreshSubscriptionGate()
+                }
+#endif
             }
         }
     }
@@ -196,7 +219,11 @@ private extension AppFeatureView {
     func wireOneClickNavigation() {
 #if os(iOS)
         viewModel.oneClick.isSubscriptionSatisfied = { [billingManager, credentialsManager] in
-            credentialsManager.isAccountActive() || billingManager.hasActiveEntitlement
+            // Lab/TF: only mock/own billing unlocks connect (ignore stale VPN isActive cache).
+            if LabMock.isEnabled {
+                return billingManager.hasActiveEntitlement
+            }
+            return credentialsManager.isAccountActive() || billingManager.hasActiveEntitlement
         }
         viewModel.oneClick.onRequestPlanPurchase = {
             showNeedPlanAlert = true

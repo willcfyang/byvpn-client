@@ -9,6 +9,7 @@ public struct HomeConnectView: View {
     private let onOpenPremium: () -> Void
 
     @State private var connectedAt: Date?
+    @State private var pulse = false
 
     public init(
         viewModel: OneClickViewModel,
@@ -33,6 +34,11 @@ public struct HomeConnectView: View {
                 speedRow
                 Spacer(minLength: ByVpnSpacing.large)
                 connectOrb
+                Text(orbStatusText)
+                    .byVpnTextStyle(.bodySmall)
+                    .foregroundStyle(Color.ByVpn.textSecondary)
+                    .padding(.top, ByVpnSpacing.medium)
+                    .opacity(orbStatusText.isEmpty ? 0 : 1)
                 Spacer(minLength: ByVpnSpacing.section)
             }
             .padding(.horizontal, ByVpnSpacing.component)
@@ -44,6 +50,10 @@ public struct HomeConnectView: View {
             } else if newValue == .disconnected || newValue == .noInternet || newValue == .noSubscription {
                 connectedAt = nil
             }
+            updatePulse(for: newValue)
+        }
+        .onAppear {
+            updatePulse(for: viewModel.connectState)
         }
     }
 }
@@ -144,9 +154,17 @@ private extension HomeConnectView {
             viewModel.connectButtonTapped()
         } label: {
             ZStack {
+                ForEach(0..<2, id: \.self) { index in
+                    Circle()
+                        .stroke(Color.ByVpn.primary.opacity(0.35 - Double(index) * 0.12), lineWidth: 2)
+                        .frame(width: 168, height: 168)
+                        .scaleEffect(pulse ? 1.12 + CGFloat(index) * 0.1 : 1.0)
+                        .opacity(pulse ? 0.2 : (isOrbBusy ? 0.55 : 0.0))
+                }
                 Circle()
                     .fill(Color.ByVpn.primary.opacity(0.2))
                     .frame(width: 168, height: 168)
+                    .scaleEffect(pulse ? 1.06 : 1.0)
                 Circle()
                     .fill(
                         RadialGradient(
@@ -161,10 +179,57 @@ private extension HomeConnectView {
                 Image(systemName: orbSymbol)
                     .font(.system(size: 44, weight: .semibold))
                     .foregroundStyle(Color.white)
+                    .symbolEffect(.pulse, isActive: isOrbBusy)
+            }
+            .frame(width: 200, height: 200)
+        }
+        .buttonStyle(ConnectOrbButtonStyle())
+        .accessibilityLabel(Text(orbAccessibility))
+    }
+
+    var isOrbBusy: Bool {
+        switch viewModel.connectState {
+        case .connecting, .disconnecting, .stop:
+            true
+        default:
+            false
+        }
+    }
+
+    var orbStatusText: String {
+        switch viewModel.connectState {
+        case .connecting:
+            return "oneClick.connectButton.connecting".localizedString
+        case .disconnecting:
+            return "disconnecting".localizedString
+        case .stop:
+            return "stop".localizedString
+        case .connected:
+            return "oneClick.connectButton.connected".localizedString
+        case .noSubscription:
+            return "byvpn.plan.needPlan.title".localizedString
+        default:
+            return ""
+        }
+    }
+
+    func updatePulse(for state: OneClickConnectState) {
+        let busy: Bool
+        switch state {
+        case .connecting, .disconnecting, .stop:
+            busy = true
+        default:
+            busy = false
+        }
+        if busy {
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        } else {
+            withAnimation(.easeOut(duration: 0.25)) {
+                pulse = false
             }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(orbAccessibility))
     }
 
     var dottedMapBackground: some View {
@@ -225,7 +290,9 @@ private extension HomeConnectView {
 
     var orbSymbol: String {
         switch viewModel.connectState {
-        case .connected, .connecting:
+        case .connected:
+            return "bolt.fill"
+        case .connecting, .disconnecting, .stop:
             return "bolt.fill"
         default:
             return "power"
@@ -235,7 +302,8 @@ private extension HomeConnectView {
     var orbAccessibility: String {
         switch viewModel.connectState {
         case .connected: return "Disconnect"
-        case .connecting, .disconnecting: return "Cancel"
+        case .connecting, .disconnecting, .stop: return "Cancel"
+        case .noSubscription: return "Select a plan"
         default: return "Connect"
         }
     }
@@ -249,5 +317,13 @@ private extension HomeConnectView {
         let m = (elapsed % 3600) / 60
         let s = elapsed % 60
         return String(format: "%02d:%02d:%02d", h, m, s)
+    }
+}
+
+private struct ConnectOrbButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .animation(.spring(response: 0.28, dampingFraction: 0.65), value: configuration.isPressed)
     }
 }

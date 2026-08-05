@@ -72,6 +72,12 @@ import PathManager
 #elseif os(macOS)
                 try await grpcManager.storeAccount(with: .vpn(mnemonic: credential))
 #endif
+                // Drop stale VPN subscription cache so a new lab login is not
+                // treated as already entitled from a previous session.
+                Task { @MainActor in
+                    accountSummary = nil
+                    accountSummaryLastFetchFailed = false
+                }
                 checkCredentialImport()
             } catch {
 #if os(iOS)
@@ -148,6 +154,7 @@ import PathManager
             }
             Task { @MainActor in
                 appSettings.accountToken = nil
+                appSettings.labUsername = nil
                 accountSummary = nil
             }
         }.value
@@ -394,7 +401,15 @@ private extension CredentialsManager {
             }
             await updateDeviceIdentifier()
             await updateAccountIdentifier()
-            await updateAccountSummary()
+            // Lab/TF: remote get_account fails and retries hang; keep summary cleared.
+            if LabMock.isEnabled {
+                await MainActor.run {
+                    accountSummary = nil
+                    accountSummaryLastFetchFailed = false
+                }
+            } else {
+                await updateAccountSummary()
+            }
         }
     }
 

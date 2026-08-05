@@ -122,6 +122,22 @@ public final class BillingManager: ObservableObject {
         return result
     }
 
+    /// Resolve per-user billing id. Lab uses username so new accounts don't inherit `lab-local` purchases.
+    public static func accountId(
+        labUsername: String?,
+        accountIdentifier: String?,
+        accountToken: String?
+    ) -> String {
+        if let labUsername, !labUsername.isEmpty { return "lab:\(labUsername)" }
+        if let accountIdentifier, !accountIdentifier.isEmpty { return accountIdentifier }
+        if let accountToken, !accountToken.isEmpty { return accountToken }
+        return "lab-local"
+    }
+
+    public func clearLocalEntitlement() {
+        entitlement = nil
+    }
+
     private static func makeDefaultService() -> any BillingService {
         if let remoteURL = LabMock.billingBaseURL.flatMap({ URL(string: $0) }),
            !LabMock.isEnabled {

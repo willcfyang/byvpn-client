@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppSettings
 import ConfigurationManager
 import ConnectionManager
 import Constants
@@ -87,6 +88,8 @@ final class LabAuthViewModel {
                 case .login:
                     // 1) Lab username/password → mnemonic (HTTP to mock API)
                     let mnemonic = try await LabAuthClient.login(username: user, password: password)
+                    // Bind mock billing to this username before credential import.
+                    AppSettings.shared.labUsername = user
                     // 2) Store mnemonic locally (must NOT require remote account registration)
                     try await credentialsManager.add(credential: mnemonic)
                     applyLabDNS()

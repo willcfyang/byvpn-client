@@ -64,6 +64,10 @@ import ConnectionTypes
     @AppStorage(AppSettingKey.accountToken.rawValue)
     public var accountToken: String?
 
+    /// Lab auth username used as mock-billing account key (per-user entitlement).
+    @AppStorage(AppSettingKey.labUsername.rawValue)
+    public var labUsername: String?
+
     @AppStorage(AppSettingKey.passphraseStored.rawValue)
     public var isPassphraseStored: Bool = false {
         didSet { isPassphraseStoredPublisher = isPassphraseStored }
@@ -230,6 +234,7 @@ public enum AppSettingKey: String {
     case countryStore
     case gatewayStore
     case accountToken
+    case labUsername
     case ipv6TrafficIsEnabled
     case statistics
     case statisticsConnectionCount

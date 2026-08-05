@@ -69,6 +69,9 @@ public struct AppFeatureView: View {
         .onAppear {
             wireOneClickNavigation()
 #if os(iOS)
+            if LabMock.isEnabled {
+                connectionManager.applyLabConnectionDefaults()
+            }
             Task {
                 if LabMock.isEnabled,
                    (AppSettings.shared.labUsername ?? "").isEmpty {

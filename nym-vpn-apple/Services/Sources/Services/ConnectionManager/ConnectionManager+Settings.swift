@@ -1,6 +1,7 @@
 import Foundation
 import AppSettings
 import ConnectionTypes
+import Constants
 import Tunnels
 #if os(macOS)
 import GRPCManager
@@ -8,6 +9,22 @@ import GRPCManager
 
 @MainActor
 extension ConnectionManager {
+    /// Pin vpn.sf lab entry/exit + 2-hop so TF connect matches desktop lab success path.
+    public func applyLabConnectionDefaults() {
+        guard LabMock.isEnabled else { return }
+        setTwoHop(true)
+        setEntryGateway(.gateway(LabMock.labEntryGatewayId))
+        setExitGateway(.gateway(LabMock.labExitGatewayId))
+        setGatewaySelectionAlgorithm(
+            ByVpnGatewaySelectionAlgorithmConfig(
+                enableGeoLocation: false,
+                algorithm: .explicit
+            )
+        )
+        setCustomDns(LabMock.labDNS)
+        setCustomDnsEnabled(true)
+        setLanBypassEnabled(true)
+    }
     public func setCustomDns(_ dns: [String]) {
         appSettings.customDns = dns
         Task {

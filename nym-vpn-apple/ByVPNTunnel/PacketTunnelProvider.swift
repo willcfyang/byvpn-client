@@ -40,6 +40,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     override func startTunnel(options: [String: NSObject]? = nil) async throws {
+        // Re-apply in this process before VPN core starts (env does not inherit from app).
+        LabMockBootstrap.setLabEnvironment()
+        LabMockBootstrap.installNetworkConfig()
+
         await tunnelActor.setTunnelProvider(self)
 
         guard let tunnelProviderProtocol = protocolConfiguration as? NETunnelProviderProtocol,

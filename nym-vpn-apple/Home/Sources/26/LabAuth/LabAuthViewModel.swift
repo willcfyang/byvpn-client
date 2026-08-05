@@ -106,8 +106,7 @@ final class LabAuthViewModel {
     }
 
     private func applyLabDNS() {
-        connectionManager.setCustomDns(LabMock.labDNS)
-        connectionManager.setCustomDnsEnabled(true)
+        connectionManager.applyLabConnectionDefaults()
     }
 
     private func mapError(_ error: Error, mode: Mode) -> String {

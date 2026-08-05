@@ -9,6 +9,7 @@ public enum LabMockBootstrap {
 
     /// Call early in app + Network Extension so VPN core sees lab probe settings.
     public static func setLabEnvironment() {
+        LabMock.persistAppGroupFlagIfNeeded()
         guard LabMock.isEnabled else { return }
         setenv("NYM_VPN_LAB_SKIP_CONNECTION_PROBE", "1", 1)
         setenv("NYM_VPN_LAB_PROBE_IP", LabMock.defaultProbeIP, 1)
@@ -18,6 +19,7 @@ public enum LabMockBootstrap {
 
     /// Writes `networks/mainnet/*.json` under the lib config cache dir (iOS).
     public static func installNetworkConfig() {
+        LabMock.persistAppGroupFlagIfNeeded()
         guard LabMock.isEnabled else { return }
         do {
             let netDir = try PathManager.configFolderURL()
@@ -27,8 +29,9 @@ public enum LabMockBootstrap {
 
             let discoveryURL = netDir.appendingPathComponent("mainnet_discovery.json")
             let mainnetURL = netDir.appendingPathComponent("mainnet.json")
-            try LabMockNetworkAssets.discoveryJSON.write(to: discoveryURL, atomically: true, encoding: .utf8)
-            try LabMockNetworkAssets.mainnetJSON.write(to: mainnetURL, atomically: true, encoding: .utf8)
+            // Fresh updated_at so MAX_FILE_AGE does not immediately invalidate the seed.
+            try stamped(LabMockNetworkAssets.discoveryJSON).write(to: discoveryURL, atomically: true, encoding: .utf8)
+            try stamped(LabMockNetworkAssets.mainnetJSON).write(to: mainnetURL, atomically: true, encoding: .utf8)
             logger.info("Installed lab network config -> \(netDir.path)")
         } catch {
             logger.error("LabMockNetworkInstallFailed: \(error.localizedDescription)")
@@ -40,5 +43,19 @@ public enum LabMockBootstrap {
         #if os(iOS)
         installNetworkConfig()
         #endif
+    }
+
+    private static func stamped(_ json: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let now = formatter.string(from: Date())
+        if json.contains("\"updated_at\"") {
+            return json.replacingOccurrences(
+                of: #"\"updated_at\"\s*:\s*\"[^\"]*\""#,
+                with: "\"updated_at\": \"\(now)\"",
+                options: .regularExpression
+            )
+        }
+        return json
     }
 }

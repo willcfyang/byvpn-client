@@ -1,7 +1,7 @@
 import AppSettings
 import ConfigurationManager
 import ConnectionTypes
-import ConnectionTypes
+import Constants
 import GatewayManager
 
 @MainActor public final class ConnectionStorage {
@@ -58,7 +58,31 @@ private extension ConnectionStorage {
     }
 
     static func generateInitialConfig() -> ConnectionConfig {
-        ConnectionConfig(
+        if LabMock.isEnabled {
+            return ConnectionConfig(
+                entry: .gateway(LabMock.labEntryGatewayId),
+                exit: .gateway(LabMock.labExitGatewayId),
+                dns: LabMock.labDNS,
+                allowLan: true,
+                disableIpv6: false,
+                enableTwoHop: true,
+                enableBridges: false,
+                enableAdBlocking: false,
+                netstack: false,
+                residentialExit: false,
+                mixnetTuningConfig: MixnetTuningConfig(
+                    backgroundTraffic: .ms200,
+                    continuousTraffic: .ms20,
+                    dissablePoissonRate: false
+                ),
+                splitTunnelConfig: SplitTunnelConfig(),
+                gatewaySelectionAlgorithmConfig: ByVpnGatewaySelectionAlgorithmConfig(
+                    enableGeoLocation: false,
+                    algorithm: .explicit
+                )
+            )
+        }
+        return ConnectionConfig(
             entry: .country("CH"),
             exit: .country("CH"),
             dns: nil,

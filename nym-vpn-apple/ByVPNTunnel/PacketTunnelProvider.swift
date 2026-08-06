@@ -58,7 +58,8 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
         _ = try await commandSender?.connectTunnel()
         do {
-            try await tunnelActor.waitUntilStarted(timeoutSeconds: 75)
+            // Account sync + zk-nym + WG register can exceed a minute on lab.
+            try await tunnelActor.waitUntilStarted(timeoutSeconds: 120)
         } catch {
             logger.error("waitUntilStarted failed: \(error)")
             await vpnService?.shutdownAndWait()

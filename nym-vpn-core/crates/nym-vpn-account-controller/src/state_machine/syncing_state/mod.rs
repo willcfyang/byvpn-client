@@ -98,12 +98,9 @@ impl SyncingState {
         if vpn_api_account.mode().is_decentralised() {
             return DecentralisedState::enter();
         }
-        // Lab / TF mock billing: app owns subscription UX; VPN-API has no real plan.
-        // Skip sync → zk-nym so connect is not blocked on InactiveSubscription.
-        if is_lab_mock_env() {
-            warn!("lab mock: skipping VPN-API account sync; entering ReadyToConnect");
-            return ReadyState::enter();
-        }
+        // Lab mock: do NOT skip sync/zk-nym here. WireGuard registration still needs
+        // tickets from RequestingZkNymsState. InactiveSubscription is bypassed later
+        // in handle_received_account_summary when is_lab_mock_env().
         let Some(device) = shared_state.device.clone() else {
             return ErrorState::enter(AccountControllerErrorStateReason::Internal {
                 context: SYNCING_STATE_CONTEXT.into(),

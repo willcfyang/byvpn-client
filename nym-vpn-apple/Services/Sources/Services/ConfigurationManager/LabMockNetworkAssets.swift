@@ -73,8 +73,8 @@ enum LabMockNetworkAssets {
     },
     "endpoints": [
       {
-        "nyxd_url": "http://104.250.122.199:8088/",
-        "websocket_url": "ws://104.250.122.199:8088/websocket",
+        "nyxd_url": "https://rpc.nymtech.net/",
+        "websocket_url": "wss://rpc.nymtech.net/websocket",
         "api_url": "http://104.250.122.199:8088/api"
       }
     ],

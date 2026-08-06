@@ -255,11 +255,13 @@ impl ConnectingState {
                 .unwrap_or(false);
         if lab_mock && next_attempt >= 3 {
             tracing::error!("lab mock: giving up after {next_attempt} connect attempts");
-            return ErrorState::enter(
-                ErrorStateReason::Internal("Lab VPN connect failed after retries".into()),
-                shared_state,
-            )
-            .await;
+            return NextTunnelState::NewState(
+                ErrorState::enter(
+                    ErrorStateReason::Internal("Lab VPN connect failed after retries".into()),
+                    shared_state,
+                )
+                .await,
+            );
         }
 
         let next_gateways = if next_attempt.is_multiple_of(2) {

@@ -331,9 +331,14 @@ impl TunnelMonitor {
 
         self.send_event(TunnelMonitorEvent::AwaitingAccountReadiness);
 
-        let readiness_fut = self.await_account_readiness_with_retry();
+        // Lab needs longer: sync + zk-nym ticket fetch before WG register.
         if lab_skip_connection_probe() {
-            match tokio::time::timeout(Duration::from_secs(30), readiness_fut).await {
+            match tokio::time::timeout(
+                Duration::from_secs(90),
+                self.await_account_readiness_with_retry(),
+            )
+            .await
+            {
                 Ok(result) => result?,
                 Err(_) => {
                     tracing::error!(
@@ -350,7 +355,7 @@ impl TunnelMonitor {
         } else {
             self.shutdown_token
                 .clone()
-                .run_until_cancelled(readiness_fut)
+                .run_until_cancelled(self.await_account_readiness_with_retry())
                 .await
                 .ok_or(tunnel::Error::Cancelled)??;
         }

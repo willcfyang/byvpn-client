@@ -30,7 +30,7 @@ public struct MixnetConfig: Codable, Equatable {
     public let gatewaySelectionAlgorithmConfig: ByVpnGatewaySelectionAlgorithmConfig
 #endif
 
-    public var name = "ByVPN Mixnet"
+    public var name = "ByVPN"
 #if os(iOS)
     public init(
         entryGateway: EntryGateway,
@@ -47,7 +47,7 @@ public struct MixnetConfig: Codable, Equatable {
         isAdBlockingEnabled: Bool,
         isTwoHopEnabled: Bool = false,
         gatewaySelectionAlgorithmConfig: ByVpnGatewaySelectionAlgorithmConfig,
-        name: String = "ByVPN Mixnet"
+        name: String = "ByVPN"
     ) {
         self.entryGateway = entryGateway
         self.exitRouter = exitRouter

@@ -237,6 +237,31 @@ impl ConnectingState {
 
     async fn reconnect(self, shared_state: &mut SharedState) -> NextTunnelState {
         let next_attempt = self.retry_attempt.saturating_add(1);
+
+        // Lab/TF: avoid infinite Connecting; fail after a few attempts so UI can recover.
+        let lab_mock = std::env::var("NYM_VPN_APP_LAB_MOCK")
+            .ok()
+            .map(|v| {
+                let v = v.to_ascii_lowercase();
+                matches!(v.as_str(), "1" | "true" | "yes")
+            })
+            .unwrap_or(false)
+            || std::env::var("NYM_VPN_LAB_SKIP_CONNECTION_PROBE")
+                .ok()
+                .map(|v| {
+                    let v = v.to_ascii_lowercase();
+                    matches!(v.as_str(), "1" | "true" | "yes")
+                })
+                .unwrap_or(false);
+        if lab_mock && next_attempt >= 3 {
+            tracing::error!("lab mock: giving up after {next_attempt} connect attempts");
+            return ErrorState::enter(
+                ErrorStateReason::Internal("Lab VPN connect failed after retries".into()),
+                shared_state,
+            )
+            .await;
+        }
+
         let next_gateways = if next_attempt.is_multiple_of(2) {
             None
         } else {

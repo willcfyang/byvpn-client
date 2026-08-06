@@ -331,11 +331,29 @@ impl TunnelMonitor {
 
         self.send_event(TunnelMonitorEvent::AwaitingAccountReadiness);
 
-        self.shutdown_token
-            .clone()
-            .run_until_cancelled(self.await_account_readiness_with_retry())
-            .await
-            .ok_or(tunnel::Error::Cancelled)??;
+        let readiness_fut = self.await_account_readiness_with_retry();
+        if lab_skip_connection_probe() {
+            match tokio::time::timeout(Duration::from_secs(30), readiness_fut).await {
+                Ok(result) => result?,
+                Err(_) => {
+                    tracing::error!(
+                        event = "lab.account_readiness_timeout",
+                        "lab mock: timed out waiting for account readiness"
+                    );
+                    return Err(Error::Account(account::Error::ControllerState(
+                        nym_vpn_lib_types::AccountControllerError::Internal(
+                            "Timed out waiting for account readiness (lab)".into(),
+                        ),
+                    )));
+                }
+            }
+        } else {
+            self.shutdown_token
+                .clone()
+                .run_until_cancelled(readiness_fut)
+                .await
+                .ok_or(tunnel::Error::Cancelled)??;
+        }
 
         self.send_event(TunnelMonitorEvent::RefreshingGateways);
 
@@ -550,14 +568,41 @@ impl TunnelMonitor {
             event = "registration.step",
             step = "S8_register_wireguard_start",
         );
-        let registration_result = Box::pin(registration_client.register()).await.map_err(|e| {
-            tracing::error!(
-                event = "registration.step",
-                step = "S8_register_wireguard_failed",
-                error = %e,
-            );
-            e
-        })?;
+        let registration_result = if lab_skip_connection_probe() {
+            match tokio::time::timeout(Duration::from_secs(60), registration_client.register()).await
+            {
+                Ok(Ok(result)) => result,
+                Ok(Err(e)) => {
+                    tracing::error!(
+                        event = "registration.step",
+                        step = "S8_register_wireguard_failed",
+                        error = %e,
+                    );
+                    return Err(e.into());
+                }
+                Err(_) => {
+                    tracing::error!(
+                        event = "registration.step",
+                        step = "S8_register_wireguard_timeout",
+                        "lab mock: gateway registration timed out"
+                    );
+                    return Err(Error::Account(account::Error::ControllerState(
+                        nym_vpn_lib_types::AccountControllerError::Internal(
+                            "Lab gateway registration timed out".into(),
+                        ),
+                    )));
+                }
+            }
+        } else {
+            Box::pin(registration_client.register()).await.map_err(|e| {
+                tracing::error!(
+                    event = "registration.step",
+                    step = "S8_register_wireguard_failed",
+                    error = %e,
+                );
+                e
+            })?
+        };
         tracing::info!(
             event = "registration.step",
             step = "S9_register_wireguard_ok",

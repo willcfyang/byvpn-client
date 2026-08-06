@@ -9,4 +9,7 @@ public enum PacketTunnelProviderError: String, Error {
 
     /// Tunnel is cancelled because state machine entered error state.
     case errorState
+
+    /// startTunnel waited too long without reaching connected/error.
+    case startTimeout
 }

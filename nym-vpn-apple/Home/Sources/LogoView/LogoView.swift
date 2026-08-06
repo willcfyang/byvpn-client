@@ -1,6 +1,5 @@
 import SwiftUI
 import Theme
-import UIComponents
 
 public struct LogoView: View {
     public var body: some View {
@@ -8,8 +7,10 @@ public struct LogoView: View {
             Spacer()
             HStack {
                 Spacer()
-                GenericImage(imageName: "logoText")
-                    .frame(width: 120)
+                Text("byvpn")
+                    .font(.system(size: 36, weight: .bold))
+                    .foregroundStyle(Color.ByVpn.textPrimary)
+                    .accessibilityLabel("byvpn")
                 Spacer()
             }
             Spacer()

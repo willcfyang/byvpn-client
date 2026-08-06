@@ -40,9 +40,10 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     override func startTunnel(options: [String: NSObject]? = nil) async throws {
-        // Re-apply in this process before VPN core starts (env does not inherit from app).
-        LabMockBootstrap.setLabEnvironment()
+        // Force lab env in the NE process (does not inherit from the app).
+        forceLabEnvironment()
         LabMockBootstrap.installNetworkConfig()
+        logger.info("startTunnel LabMock.isEnabled=\(LabMock.isEnabled)")
 
         await tunnelActor.setTunnelProvider(self)
 
@@ -56,7 +57,22 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         try await setup(vpnConfig: vpnConfig)
 
         _ = try await commandSender?.connectTunnel()
-        try await tunnelActor.waitUntilStarted()
+        do {
+            try await tunnelActor.waitUntilStarted(timeoutSeconds: 75)
+        } catch {
+            logger.error("waitUntilStarted failed: \(error)")
+            await vpnService?.shutdownAndWait()
+            throw error
+        }
+    }
+
+    /// Always set lab probe/mock flags so connect cannot hang on remote subscription sync / probe.
+    private func forceLabEnvironment() {
+        setenv("NYM_VPN_LAB_SKIP_CONNECTION_PROBE", "1", 1)
+        setenv("NYM_VPN_APP_LAB_MOCK", "1", 1)
+        setenv("NYM_VPN_LAB_PROBE_IP", LabMock.defaultProbeIP, 1)
+        UserDefaults(suiteName: Constants.groupID.rawValue)?.set(true, forKey: "byvpn.labMock.enabled")
+        LabMockBootstrap.setLabEnvironment()
     }
 
     override func stopTunnel(with reason: NEProviderStopReason) async {

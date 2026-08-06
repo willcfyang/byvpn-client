@@ -36,8 +36,9 @@ public struct CustomNavBar: View {
                 Text(title)
                     .textStyle(.Headline.Medium.regular)
             } else if !isLogoImageHidden {
-                Image("logoText", bundle: .module)
-                    .frame(width: 110, height: 16)
+                Text("byvpn")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.ByVpn.textPrimary)
                     .accessibilityLabel("ByVPN".localizedString)
             }
             Spacer()

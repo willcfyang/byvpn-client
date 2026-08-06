@@ -77,8 +77,23 @@ actor TunnelActor {
         tunnelState = state
     }
 
-    /// Wait until the tunnel state shifted into either connected, disconnected or error state.
-    func waitUntilStarted() async throws {
+    /// Wait until connected/disconnected/error, or fail after `timeoutSeconds`.
+    func waitUntilStarted(timeoutSeconds: TimeInterval = 75) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { [weak self] in
+                try await self?.waitUntilTerminalState()
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(timeoutSeconds))
+                throw PacketTunnelProviderError.startTimeout
+            }
+            // First finished wins (success or error/timeout).
+            try await group.next()!
+            group.cancelAll()
+        }
+    }
+
+    private func waitUntilTerminalState() async throws {
         var stateStream = $tunnelState.values.makeAsyncIterator()
 
         while case let .some(newState) = await stateStream.next() {
@@ -98,5 +113,6 @@ actor TunnelActor {
                 }
             }
         }
+        throw PacketTunnelProviderError.startTimeout
     }
 }

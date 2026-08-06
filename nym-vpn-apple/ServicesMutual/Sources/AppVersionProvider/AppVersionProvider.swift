@@ -18,6 +18,15 @@ public enum AppVersionProvider {
         }
         return version
     }
+
+    /// Build number from `CFBundleVersion` (e.g. TestFlight 448).
+    public static func buildNumber(in bundle: Bundle = .main) -> String {
+        (bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String) ?? "?"
+    }
+
+    public static func versionWithBuild(in bundle: Bundle = .main) -> String {
+        "\(appVersion(in: bundle)) (\(buildNumber(in: bundle)))"
+    }
 }
 
 private extension AppVersionProvider {

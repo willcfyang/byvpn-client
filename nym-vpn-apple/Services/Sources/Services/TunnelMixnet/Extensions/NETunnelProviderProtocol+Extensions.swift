@@ -10,7 +10,7 @@ import Keychain
             let configString = mixnetConfiguration.toJson()
         else { return nil }
 
-        providerBundleIdentifier = "\(appId).network-extension"
+        providerBundleIdentifier = "\(appId).tunnel"
         serverAddress = "127.0.0.1"
 
         passwordReference = Keychain.updateReferenceOrCreateNew(

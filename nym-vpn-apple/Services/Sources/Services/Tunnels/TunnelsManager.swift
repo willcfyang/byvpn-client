@@ -109,6 +109,17 @@ private extension TunnelsManager {
                 guard let proto = manager.protocolConfiguration as? NETunnelProviderProtocol else { continue }
 
 #if os(iOS)
+                // Drop stale profiles that pointed at the old/nonexistent network-extension ID.
+                let expectedProviderId = (Bundle.main.bundleIdentifier ?? "com.byvpn.app") + ".tunnel"
+                if let providerId = proto.providerBundleIdentifier, providerId != expectedProviderId {
+                    logger.info("Removing stale VPN profile provider=\(providerId) expected=\(expectedProviderId)")
+                    if let ref = proto.passwordReference {
+                        Keychain.deleteReference(called: ref)
+                    }
+                    manager.removeFromPreferences { _ in }
+                    managers.remove(at: idx)
+                    continue
+                }
                 let passwordRef = proto.verifyConfigurationReference() ? proto.passwordReference : nil
 #elseif os(macOS)
                 let passwordRef: Data?

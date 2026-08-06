@@ -119,7 +119,10 @@ extension ConnectionManager {
     @MainActor func connect(with config: MixnetConfig) async throws {
         do {
             try await tunnelsManager.loadTunnels()
-            let tunnel = try await tunnelsManager.addUpdate(tunnelConfiguration: config, isOndemandEnabled: true)
+            let tunnel = try await tunnelsManager.addUpdate(
+                tunnelConfiguration: config,
+                isOndemandEnabled: !LabMock.isEnabled
+            )
             activeTunnel = tunnel
             try await tunnelsManager.connect(tunnel: tunnel)
             appSettings.statisticsConnectionCount += 1

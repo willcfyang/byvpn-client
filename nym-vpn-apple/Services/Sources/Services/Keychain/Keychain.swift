@@ -39,6 +39,9 @@ public class Keychain {
         if bundleIdentifier.hasSuffix(".network-extension") {
             bundleIdentifier.removeLast(".network-extension".count)
         }
+        if bundleIdentifier.hasSuffix(".tunnel") {
+            bundleIdentifier.removeLast(".tunnel".count)
+        }
         let itemLabel = "WireGuard Tunnel: \(name)"
         var items: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -106,6 +109,9 @@ public class Keychain {
         }
         if bundleIdentifier.hasSuffix(".network-extension") {
             bundleIdentifier.removeLast(".network-extension".count)
+        }
+        if bundleIdentifier.hasSuffix(".tunnel") {
+            bundleIdentifier.removeLast(".tunnel".count)
         }
         let itemLabel = "WireGuard Tunnel: \(name)"
 

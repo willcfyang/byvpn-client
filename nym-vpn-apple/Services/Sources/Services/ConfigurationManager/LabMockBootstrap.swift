@@ -46,8 +46,11 @@ public enum LabMockBootstrap {
     }
 
     private static func stamped(_ json: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        // Rust UtcDateTime human format: "yyyy-MM-dd HH:mm:ss.fffffffff" (no T/Z).
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSSSSS"
         let now = formatter.string(from: Date())
         if json.contains("\"updated_at\"") {
             return json.replacingOccurrences(

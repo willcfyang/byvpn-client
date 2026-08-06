@@ -87,6 +87,7 @@ actor TunnelActor {
                 return
             case let .error(errorStateReason):
                 lastError = ErrorReason(with: errorStateReason)
+                throw ErrorReason(with: errorStateReason).nsError
             case .disconnecting, .none, .connecting:
                 break
             case let .some(.offline(reconnect: reconnect)):

@@ -82,7 +82,10 @@ extension MixnetConfig {
             enableLewesProtocol: false,
             residentialExit: false,
             enableAdBlocking: isAdBlockingEnabled,
-            frontingMode: isStealthApiEnabled ? .always : .onRetry,
+            frontingMode: {
+                if LabMock.isEnabled { return .off }
+                return isStealthApiEnabled ? .always : .onRetry
+            }(),
             customDns: customDns,
             mixnetTraffic: mixnetTuning.mixnetTrafficConfig(),
             networkStats: nil,
